@@ -1,0 +1,1 @@
+# HostClipboard-client-rs-macos

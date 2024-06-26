@@ -1,0 +1,13 @@
+[package]
+name = "HostClipboard-client-rs-macos"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fltk = "^1.4"
+cocoa = "0.25.0"
+"core-graphics" = "0.17.3"
+objc = "0.2.3"
+chrono = "0.4"
