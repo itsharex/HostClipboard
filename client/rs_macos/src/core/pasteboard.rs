@@ -1,7 +1,8 @@
 extern crate chrono;
-use std::fmt;
-use std::io;
 
+use std::cmp::PartialEq;
+use std::io;
+use std::ops::Deref;
 use chrono::Local;
 use cocoa::appkit::{
     NSPasteboard, NSPasteboardTypeMultipleTextSelection, NSPasteboardTypePNG,
@@ -10,67 +11,18 @@ use cocoa::appkit::{
 use cocoa::base::{id, nil};
 use cocoa::foundation::{NSArray, NSString};
 use cocoa::foundation::{NSData, NSInteger};
+use crate::core::pasteboard_content::{ContentType, PasteboardContent};
 
 #[link(name = "AppKit", kind = "framework")]
 extern "C" {
     pub static NSPasteboardTypeFileURL: id;
 }
+
+
 pub struct Pasteboard {
     pub change_count: NSInteger,
 }
 
-#[derive(Debug)]
-pub enum ContentType {
-    Text,
-    File,
-    FileImage,
-    PBImage,
-    PBOther,
-}
-
-pub struct PasteboardContent {
-    pub text_content: String,
-    pub content_type: ContentType,
-    pub content: Option<Vec<u8>>,
-    item: id,
-}
-
-impl PasteboardContent {
-    // 创建文本类型的 PasteboardContent
-    pub fn new(
-        text_content: String,
-        content_type: ContentType,
-        content: Option<Vec<u8>>,
-        item: id,
-    ) -> Self {
-        PasteboardContent {
-            text_content,
-            content_type,
-            content,
-            item,
-        }
-    }
-
-    pub fn read_content(&self) -> Result<(), io::Error> {
-        // TODO: 读取content 二进制数据 并且存入content字段
-        Ok(())
-    }
-}
-
-impl fmt::Debug for PasteboardContent {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let content_length = match &self.content {
-            Some(bytes) => format!("{}", bytes.len()),
-            None => "None".to_string(),
-        };
-
-        f.debug_struct("PasteboardContent")
-            .field("content_type", &self.content_type)
-            .field("content", &content_length)
-            .field("text_content", &self.text_content)
-            .finish()
-    }
-}
 impl Pasteboard {
     pub fn new() -> Self {
         Pasteboard {
@@ -100,6 +52,26 @@ impl Pasteboard {
         contents
     }
 
+    pub unsafe fn set_contents(&mut self, item: id) -> Result<(), io::Error> {
+        let pasteboard: id = NSPasteboard::generalPasteboard(nil);
+        pasteboard.clearContents();
+
+        let item_list = NSArray::arrayWithObject(nil, item);
+
+        let success = pasteboard.writeObjects(item_list) == 1;
+
+        if success {
+            Ok(())
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Failed to write to the pasteboard",
+            ))
+        }
+    }
+}
+
+impl Pasteboard {
     unsafe fn get_item(&self, item: id) -> Option<PasteboardContent> {
         // 优先检查文件 URL 类型
         if let Some(file_url_str) = self.get_file_url(item) {
@@ -227,3 +199,44 @@ impl Pasteboard {
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use std::thread;
+    use std::time::Duration;
+    use cocoa::appkit::NSPasteboard;
+    use cocoa::base::{id, nil};
+    use cocoa::foundation::NSArray;
+    use crate::core::pasteboard::{ContentType, Pasteboard};
+
+    #[test]
+    fn test_build() {
+        println!("build pass!")
+    }
+
+    #[test]
+    fn new_type() {
+        let c_type = ContentType::File;
+        println!("{:?}", c_type.to_string());
+    }
+
+    // #[test]
+    // fn set_contents() {
+    //     // 获取上上个剪切板内容
+    //     unsafe {
+    //         let mut pb = Pasteboard::new();
+    //         thread::sleep(Duration::from_secs_f64(2));
+    //         // println!(“)
+    //
+    //         let mut now_contents = pb.get_contents();
+    //         println!("now_contents {:?}", now_contents);
+    //         // 等待0.5s
+    //         thread::sleep(Duration::from_secs_f64(0.5));
+    //         let l_contents = pb.get_contents();
+    //         println!("l_contents {:?}", l_contents);
+    //
+    //         assert!(now_contents.len() > 0, "now_contents 为空");
+    //         let item = now_contents[0].item.clone();
+    //     }
+    // }
+}
