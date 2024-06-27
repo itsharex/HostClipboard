@@ -204,9 +204,13 @@ impl Pasteboard {
 mod tests {
     use std::thread;
     use std::time::Duration;
-    use cocoa::appkit::NSPasteboard;
+    use cocoa::appkit::{NSApp, NSApplication, NSImage, NSPasteboard};
     use cocoa::base::{id, nil};
-    use cocoa::foundation::NSArray;
+    use cocoa::foundation::{NSArray, NSAutoreleasePool, NSData, NSString, NSURL};
+    use objc::runtime::{Object, Sel};
+    use objc::declare::ClassDecl;
+    use objc::{msg_send, sel, sel_impl};
+    use std::ptr;
     use crate::core::pasteboard::{ContentType, Pasteboard};
 
     #[test]
@@ -220,23 +224,58 @@ mod tests {
         println!("{:?}", c_type.to_string());
     }
 
-    // #[test]
-    // fn set_contents() {
-    //     // 获取上上个剪切板内容
-    //     unsafe {
-    //         let mut pb = Pasteboard::new();
-    //         thread::sleep(Duration::from_secs_f64(2));
-    //         // println!(“)
-    //
-    //         let mut now_contents = pb.get_contents();
-    //         println!("now_contents {:?}", now_contents);
-    //         // 等待0.5s
-    //         thread::sleep(Duration::from_secs_f64(0.5));
-    //         let l_contents = pb.get_contents();
-    //         println!("l_contents {:?}", l_contents);
-    //
-    //         assert!(now_contents.len() > 0, "now_contents 为空");
-    //         let item = now_contents[0].item.clone();
-    //     }
-    // }
+    #[test]
+    fn set_contents_text() {
+        // 获取上上个剪切板内容
+        unsafe {
+            // 获取剪切板
+            let pasteboard: id = NSPasteboard::generalPasteboard(nil);
+
+            // 清除剪切板内容
+            pasteboard.clearContents();
+
+            // 写入文本
+            let string = NSString::alloc(nil).init_str("123Hello, Rust and Cocoa!");
+            let objects = NSArray::arrayWithObject(nil, string);
+            let _: bool = msg_send![pasteboard, writeObjects: objects];
+        }
+    }
+
+       #[test]
+    fn set_contents_file() {
+        // 获取上上个剪切板内容
+        unsafe {
+            // 获取剪切板
+            let pasteboard: id = NSPasteboard::generalPasteboard(nil);
+
+            // 清除剪切板内容
+            pasteboard.clearContents();
+
+            // let file_path = NSString::alloc(nil).init_str("/Users/zeke/Downloads/表格问答功能测试反馈-0626.xlsx");
+            let file_path = NSString::alloc(nil).init_str("/Users/zeke/Downloads/iShot2024-06-26 16.48.00.png");
+            let file_url = NSURL::fileURLWithPath_(nil, file_path);
+            let objects = NSArray::arrayWithObject(nil, file_url);
+            let _: bool = msg_send![pasteboard, writeObjects: objects];
+
+        }
+    }
+
+       #[test]
+    fn set_contents_png() {
+        // 获取上上个剪切板内容
+        unsafe {
+            // 获取剪切板
+            let pasteboard: id = NSPasteboard::generalPasteboard(nil);
+
+            // 清除剪切板内容
+            pasteboard.clearContents();
+
+            let image_path = NSString::alloc(nil).init_str("/Users/zeke/Downloads/iShot2024-06-26 16.48.00.png");
+            let image_url = NSURL::fileURLWithPath_(nil, image_path);
+            let image_data = NSData::dataWithContentsOfURL_(nil, image_url);
+            let image = NSImage::initWithData_(NSImage::alloc(nil), image_data);
+            let objects = NSArray::arrayWithObject(nil, image);
+            let _: bool = msg_send![pasteboard, writeObjects: objects];
+        }
+    }
 }
