@@ -2,6 +2,7 @@
   "name": "host_clipboard",
   "version": "0.0.1",
   "description": "HostClipboard的client demo",
+  "homepage": "https://github.com/Zeke-chin/HostClipboard",
   "main": "main.js",
   "scripts": {
     "start": "nodemon --exec electron .",
@@ -31,13 +32,34 @@
         }
       ]
     },
+    "linux": {
+      "icon": "./icons/icon.png",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility"
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": true,
       "allowToChangeInstallationDirectory": true
     }
   },
-  "author": "zeke",
+  "author": {
+    "name": "zeke",
+    "email": "zeke.chin@icloud.com"
+  },
   "engines": {
     "node": ">=20.15"
   },

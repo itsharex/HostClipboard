@@ -16,10 +16,14 @@ function hideAndClearWindow() {
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 800, height: 600, webPreferences: {
-            preload: path.join(__dirname, "preload.js"), nodeIntegration: false, // 禁用 Node.js 集成
+            preload: path.join(__dirname, "preload.js"),
+            nodeIntegration: false, // 禁用 Node.js 集成
             contextIsolation: true, // 启用上下文隔离
-        }, // show: false, // 隐藏窗口
+        },
+        // show: false, // 隐藏窗口
         frame: false, // 创建无边框窗口
+        icon: path.join(__dirname, 'icons/icon.png')  // 添加这一行，使用您的图标文件路径
+
     });
 
     mainWindow.loadFile("pages/index.html");
