@@ -43,8 +43,5 @@
     "electron": "^31.2.0",
     "electron-builder": "^24.13.3",
     "nodemon": "^3.1.4"
-  },
-  "dependencies": {
-    "electron-tray": "^0.1.1"
   }
 }
