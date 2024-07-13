@@ -38,6 +38,9 @@
     }
   },
   "author": "zeke",
+  "engines": {
+    "node": ">=20.15"
+  },
   "license": "MIT",
   "devDependencies": {
     "electron": "^31.2.0",
