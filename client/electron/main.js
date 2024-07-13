@@ -1,10 +1,5 @@
 const {
-    app,
-    BrowserWindow,
-    Tray,
-    Menu,
-    globalShortcut,
-    ipcMain,
+    app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain,
 } = require("electron");
 const path = require("path");
 
@@ -14,22 +9,16 @@ let tray = null;
 function hideAndClearWindow() {
     if (mainWindow) {
         mainWindow.hide();
-        mainWindow.webContents.executeJavaScript(
-            'document.getElementById("text-input").value = ""'
-        ); // 清空输入框
+        mainWindow.webContents.executeJavaScript('document.getElementById("text-input").value = ""'); // 清空输入框
     }
 }
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
-        webPreferences: {
-            preload: path.join(__dirname, "preload.js"),
-            nodeIntegration: false, // 禁用 Node.js 集成
+        width: 800, height: 600, webPreferences: {
+            preload: path.join(__dirname, "preload.js"), nodeIntegration: false, // 禁用 Node.js 集成
             contextIsolation: true, // 启用上下文隔离
-        },
-        // show: false, // 隐藏窗口
+        }, // show: false, // 隐藏窗口
         frame: false, // 创建无边框窗口
     });
 
@@ -38,34 +27,29 @@ function createWindow() {
     mainWindow.webContents.on("did-finish-load", () => {
         mainWindow.webContents.send("list-items", ["Item 1", "Item 2", "Item 3"]);
     });
-    // 隐藏 Dock 图标
-    app.dock.hide();
+
+    if (process.platform === 'darwin') {
+        app.dock.hide();
+    }
 
     // 创建系统托盘图标
     if (!tray) {
         tray = new Tray(path.join(__dirname, "icons/bar_18x18.png")); // 替换为你的图标路径
-        const contextMenu = Menu.buildFromTemplate([
-            {
-                label: "Show App",
-                click: function () {
-                    if (mainWindow) {
-                        mainWindow.show();
-                        mainWindow.webContents.executeJavaScript(
-                            'document.getElementById("text-input").focus()'
-                        );
-                    } else {
-                        createWindow();
-                    }
-                },
+        const contextMenu = Menu.buildFromTemplate([{
+            label: "Show App", click: function () {
+                if (mainWindow) {
+                    mainWindow.show();
+                    mainWindow.webContents.executeJavaScript('document.getElementById("text-input").focus()');
+                } else {
+                    createWindow();
+                }
             },
-            {
-                label: "Quit",
-                click: function () {
-                    app.isQuitting = true;
-                    app.quit();
-                },
+        }, {
+            label: "Quit", click: function () {
+                app.isQuitting = true;
+                app.quit();
             },
-        ]);
+        },]);
         tray.setContextMenu(contextMenu);
         tray.setToolTip("This is my application.");
     }
@@ -99,9 +83,7 @@ app.whenReady().then(() => {
                 hideAndClearWindow();
             } else {
                 mainWindow.show();
-                mainWindow.webContents.executeJavaScript(
-                    'document.getElementById("text-input").focus()'
-                );
+                mainWindow.webContents.executeJavaScript('document.getElementById("text-input").focus()');
             }
         } else {
             createWindow();
