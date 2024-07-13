@@ -123,3 +123,4 @@ docs/_build/
 target/
 
 .vscode/
+node_modules

@@ -1,0 +1,50 @@
+{
+  "name": "host_clipboard",
+  "version": "0.0.1",
+  "description": "HostClipboard的client demo",
+  "main": "main.js",
+  "scripts": {
+    "start": "nodemon --exec electron .",
+    "build": "electron-builder"
+  },
+  "build": {
+    "appId": "com.hostclipboard.client",
+    "win": {
+      "icon": "./icons/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "mac": {
+      "icon": "./icons/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "author": "zeke",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.2.0",
+    "electron-builder": "^24.13.3",
+    "nodemon": "^3.1.4"
+  },
+  "dependencies": {
+    "electron-tray": "^0.1.1"
+  }
+}

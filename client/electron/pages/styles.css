@@ -1,0 +1,69 @@
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#input-container {
+  padding: 10px;
+  background-color: #f0f0f0;
+  display: flex;
+  justify-content: center;
+}
+
+#text-input {
+  width: 100%;
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+#content-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+#list-container {
+  width: 50%;
+  overflow-y: auto;
+  border-right: 1px solid #ccc;
+}
+
+#display-container {
+  width: 50%;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+#selectable-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+#selectable-list li {
+  padding: 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+
+/*#selectable-list li:hover {*/
+/*  background-color: #f0f0f0;*/
+/*}*/
+
+#selectable-list li {
+  cursor: pointer;
+}
+#selectable-list li:hover,
+#selectable-list li.selected {
+  background-color: #4CAF50;
+  color: white;
+}
