@@ -1,0 +1,240 @@
+extern crate chrono;
+use chrono::offset::FixedOffset;
+use chrono::DateTime;
+use chrono::Datelike;
+use cocoa::base::nil;
+use std::cmp::PartialEq;
+use std::fmt;
+use std::io;
+use std::io::Write;
+use std::sync::{Arc, Mutex};
+use cocoa::appkit::{NSPasteboardTypePNG, NSPasteboardTypeTIFF};
+use crate::apis::safe_objc_ptr::SafeObjcPtr;
+use crate::utils;
+
+#[derive(Debug, Clone)]
+pub enum ContentType {
+    Text,
+    File,
+    FileImage,
+    PBImage,
+    PBOther,
+}
+
+impl ContentType {
+    pub fn to_i32(&self) -> i32 {
+        match self {
+            ContentType::Text => 0,
+            ContentType::File => 10,
+            ContentType::FileImage => 11,
+            ContentType::PBImage => 21,
+            ContentType::PBOther => 22,
+        }
+    }
+}
+impl ToString for ContentType {
+    fn to_string(&self) -> String {
+        match self {
+            ContentType::Text => "Text".to_string(),
+            ContentType::File => "File".to_string(),
+            ContentType::FileImage => "FileImage".to_string(),
+            ContentType::PBImage => "PBImage".to_string(),
+            ContentType::PBOther => "PBOther".to_string(),
+        }
+    }
+}
+
+pub struct PasteboardContent {
+    pub text_content: String,          // 索引内容
+    pub content_type: ContentType,     // 类型
+    pub content: Option<Vec<u8>>,      // 二进制内容
+    pub path: String,                  // 路径
+    pub item: Arc<Mutex<SafeObjcPtr>>, // 对应的item对象
+    pub uuid: String,
+    pub date_time: DateTime<FixedOffset>,
+}
+
+impl PartialEq for ContentType {
+    fn eq(&self, other: &Self) -> bool {
+        std::mem::discriminant(self) == std::mem::discriminant(other)
+    }
+}
+
+fn get_local_path(
+    date_time: &DateTime<FixedOffset>,
+    suffix: &String,
+) -> Result<String, io::Error> {
+    let root_file_path = format!(
+        "/Users/zeke/.cache/host-clipboard/files/{}{}{}",
+        date_time.year(),
+        date_time.month(),
+        date_time.day()
+    );
+    // 判断root_file_path 是否存在 不存在则递归创建
+    if !std::path::Path::new(&root_file_path).exists() {
+        std::fs::create_dir_all(&root_file_path).unwrap_or_else(|e| {
+            panic!("Failed to create directories: {}", e);
+        });
+    }
+    Ok(format!(
+        "{}/{}.{}",
+        root_file_path,
+        date_time.timestamp(),
+        suffix
+    ))
+}
+impl PasteboardContent {
+    // 创建文本类型的 PasteboardContent
+    pub fn new(
+        text_content: String,
+        content_type: ContentType,
+        content: Option<Vec<u8>>,
+        item: *mut objc::runtime::Object,
+    ) -> Arc<Mutex<Self>> {
+        let date_time = utils::time::get_current_date_time();
+
+        // 定义text_content
+        let suffix: String;
+        let tc = match content_type {
+            ContentType::Text => {
+                suffix = "txt".to_string();
+                text_content
+            }
+            ContentType::PBImage => {
+                let parts: Vec<&str> = text_content.split('.').collect();
+                let size = parts.iter()
+                    .take(parts.len().saturating_sub(1))
+                    .cloned()
+                    .collect::<Vec<&str>>()
+                    .join(".");
+                suffix = parts[parts.len() - 1].to_string();
+                format!("{}: ({})", content_type.to_string(), size)
+            }
+            ContentType::File | ContentType::FileImage => {
+                let parts: Vec<&str> = text_content.split('.').collect();
+                let size = parts.iter()
+                    .take(parts.len().saturating_sub(1))
+                    .cloned()
+                    .collect::<Vec<&str>>()
+                    .join(".");
+                suffix = parts[parts.len() - 1].to_string();
+                format!("{}: ({})", content_type.to_string(), size)
+            }
+            _ => {
+                suffix = "other".to_string();
+                text_content
+            }
+        };
+        let path = get_local_path(&date_time, &suffix).unwrap();
+
+        let safe_item = SafeObjcPtr::new(item);
+
+        let pasteboard_content = Arc::new(Mutex::new(PasteboardContent {
+            text_content: tc,
+            content_type,
+            content,
+            path,
+            item: Arc::new(Mutex::new(safe_item)),
+            uuid: utils::uuid::get_uuid(),
+            date_time,
+        }));
+
+        let pasteboard_content_clone = Arc::clone(&pasteboard_content);
+        // 启动异步任务来执行save_path
+        tokio::spawn(async move {
+            if let Err(e) = Self::async_save_path(pasteboard_content_clone).await {
+                eprintln!("Error saving path: {}", e);
+            }
+        });
+        pasteboard_content
+    }
+
+    async fn async_save_path(pasteboard_content: Arc<Mutex<Self>>) -> Result<(), String> {
+        let item = pasteboard_content.lock().unwrap().clone();
+        println!("启动 读取data的tokio,text_content: {}", item.text_content);
+        let result = item.save_path();
+        if let Ok(()) = result {
+            Ok(())
+        } else {
+            Err("Failed to save path".to_string())
+        }
+    }
+
+    pub fn save_path(self) -> Result<(), io::Error> {
+        // TODO: 存入路径
+        match self.content_type {
+            ContentType::Text => {
+                let data = self.text_content;
+                // 向local_path写入
+                let mut file = std::fs::File::create(self.path).unwrap();
+                file.write_all(data.as_bytes()).unwrap();
+            }
+            ContentType::File | ContentType::FileImage => {
+                match self.content {
+                    Some(data) => {
+                        let mut file = std::fs::File::create(self.path).unwrap();
+                        file.write_all(&data).unwrap();
+                    }
+                    _ => {}
+                }
+            }
+            _ => {
+                let data = self.content.unwrap();
+                // 向local_path写入
+                let mut file = std::fs::File::create(self.path).unwrap();
+                file.write_all(&data).unwrap();
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn _fake_new(num: usize) -> Vec<Self> {
+        let mut result: Vec<PasteboardContent> = vec![];
+        let empty_ptr = SafeObjcPtr::new(nil);
+        let empty_item = Arc::new(Mutex::new(empty_ptr));
+
+        for i in 0..num {
+            let text = std::iter::repeat(format!("{} hi", i)).take(40).collect();
+            result.push(PasteboardContent {
+                text_content: text,
+                content_type: ContentType::Text,
+                content: None,
+                path: "".to_string(),
+                item: Arc::clone(&empty_item),
+                uuid: utils::uuid::get_uuid(),
+                date_time: utils::time::get_current_date_time(),
+            });
+        }
+        result
+    }
+}
+
+impl Clone for PasteboardContent {
+    fn clone(&self) -> Self {
+        PasteboardContent {
+            text_content: self.text_content.clone(),
+            content_type: self.content_type.clone(),
+            content: self.content.clone(),
+            path: self.path.clone(),
+            item: Arc::clone(&self.item),
+            uuid: self.uuid.clone(),
+            date_time: self.date_time.clone(),
+        }
+    }
+}
+
+impl fmt::Debug for PasteboardContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let content_length = match &self.content {
+            Some(bytes) => format!("{}", bytes.len()),
+            None => "None".to_string(),
+        };
+
+        f.debug_struct("PasteboardContent")
+            .field("content_type", &self.content_type)
+            .field("content", &content_length)
+            .field("text_content", &self.text_content)
+            .finish()
+    }
+}

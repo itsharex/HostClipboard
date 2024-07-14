@@ -1,6 +1,10 @@
+use cocoa::appkit::{NSPasteboard, NSPasteboardTypeString};
+use cocoa::base::id;
+use cocoa::foundation::NSData;
+use cocoa::foundation::NSString;
+use objc::runtime::Object;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use objc::runtime::Object;
 
 #[derive(Debug, Clone)]
 pub struct SafeObjcPtr {
@@ -31,4 +35,3 @@ impl Deref for SafeObjcPtr {
         &self.ptr
     }
 }
-

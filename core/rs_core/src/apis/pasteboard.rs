@@ -1,8 +1,8 @@
 extern crate chrono;
 
-use std::cmp::PartialEq;
-use std::io;
-use std::ops::Deref;
+use std::{fs, io};
+use std::path::Path;
+use crate::schema::clipboard::{ContentType, PasteboardContent};
 use chrono::Local;
 use cocoa::appkit::{
     NSPasteboard, NSPasteboardTypeMultipleTextSelection, NSPasteboardTypePNG,
@@ -11,13 +11,13 @@ use cocoa::appkit::{
 use cocoa::base::{id, nil};
 use cocoa::foundation::{NSArray, NSString};
 use cocoa::foundation::{NSData, NSInteger};
-use crate::core::pasteboard_content::{ContentType, PasteboardContent};
+use std::sync::{Arc, Mutex};
+use url::Url;
 
 #[link(name = "AppKit", kind = "framework")]
 extern "C" {
     pub static NSPasteboardTypeFileURL: id;
 }
-
 
 pub struct Pasteboard {
     pub change_count: NSInteger,
@@ -52,23 +52,23 @@ impl Pasteboard {
         contents
     }
 
-    pub unsafe fn set_contents(&mut self, item: id) -> Result<(), io::Error> {
-        let pasteboard: id = NSPasteboard::generalPasteboard(nil);
-        pasteboard.clearContents();
+    // pub unsafe fn set_contents(&mut self, item: id) -> Result<(), io::Error> {
+    //     let pasteboard: id = NSPasteboard::generalPasteboard(nil);
+    //     pasteboard.clearContents();
 
-        let item_list = NSArray::arrayWithObject(nil, item);
+    //     let item_list = NSArray::arrayWithObject(nil, item);
 
-        let success = pasteboard.writeObjects(item_list) == 1;
+    //     let success = pasteboard.writeObjects(item_list) == true;
 
-        if success {
-            Ok(())
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Failed to write to the pasteboard",
-            ))
-        }
-    }
+    //     if success {
+    //         Ok(())
+    //     } else {
+    //         Err(io::Error::new(
+    //             io::ErrorKind::Other,
+    //             "Failed to write to the pasteboard",
+    //         ))
+    //     }
+    // }
 }
 
 impl Pasteboard {
@@ -82,66 +82,57 @@ impl Pasteboard {
             } else {
                 ContentType::File
             };
-            return Some(PasteboardContent::new(
-                file_url_str,
-                content_type,
-                None,
-                item,
-            ));
+
+            let rust_bytes: Option<Vec<u8>> = if file_size_is_large(&file_url_str).expect("判断文件大小失败") {
+                None
+            } else {
+                self.get_data(item, NSPasteboardTypeFileURL)
+            };
+            let pasteboard_content = PasteboardContent::new(file_url_str, content_type, rust_bytes, item);
+            let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
+            return Some(res);
         }
 
         // 检查多文本类型
         if let Some(string) = self.get_multi_text_content(item) {
-            return Some(PasteboardContent::new(
-                string,
-                ContentType::Text,
-                None,
-                item,
-            ));
+            let pasteboard_content = PasteboardContent::new(string, ContentType::Text, None, item);
+            let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
+            return Some(res);
         }
 
         // 检查文本类型
         if let Some(string) = self.get_text_content(item) {
-            return Some(PasteboardContent::new(
-                string,
-                ContentType::Text,
-                None,
-                item,
-            ));
+            let pasteboard_content = PasteboardContent::new(string, ContentType::Text, None, item);
+            let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
+            return Some(res);
         }
 
         // 对于两者都不是的 则要读取 item data， 如果是 NSPasteboardTypeTIFF， NSPasteboardTypePNG则是图片
         // 否则则是文件
         // 读取 item data
         if let Some(rust_bytes) = self.get_data(item, NSPasteboardTypeTIFF) {
-            let text_content = self.get_now_string();
-            return Some(PasteboardContent::new(
-                text_content,
-                ContentType::PBImage,
-                Some(rust_bytes),
-                item,
-            ));
+            let text_content = format!("{}.tiff", format_size(rust_bytes.len()));
+            let pasteboard_content =
+                PasteboardContent::new(text_content, ContentType::PBImage, Some(rust_bytes), item);
+            let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
+            return Some(res);
         }
 
         // 读取 item data
         if let Some(rust_bytes) = self.get_data(item, NSPasteboardTypePNG) {
-            let text_content = self.get_now_string();
-            return Some(PasteboardContent::new(
-                text_content,
-                ContentType::PBImage,
-                Some(rust_bytes),
-                item,
-            ));
+            let text_content = format!("{}.png", format_size(rust_bytes.len()));
+            let pasteboard_content =
+                PasteboardContent::new(text_content, ContentType::PBImage, Some(rust_bytes), item);
+            let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
+            return Some(res);
         }
 
         // 读取 item data
-        let text_content = format!("{}-other", self.get_now_string());
-        Some(PasteboardContent::new(
-            text_content,
-            ContentType::PBOther,
-            None,
-            item,
-        ))
+        let text_content = format!("{}.other", self.get_now_string());
+        let pasteboard_content =
+            PasteboardContent::new(text_content, ContentType::PBOther, None, item);
+        let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
+        return Some(res);
     }
 
     unsafe fn get_file_url(&self, item: id) -> Option<String> {
@@ -199,19 +190,52 @@ impl Pasteboard {
     }
 }
 
+fn format_size(size: usize) -> String {
+    const KB: usize = 1024;
+    const MB: usize = 1024 * KB;
+    const GB: usize = 1024 * MB;
+
+    if size < KB {
+        format!("{} B", size)
+    } else if size < MB {
+        format!("{:.2} KB", size as f64 / KB as f64)
+    } else if size < GB {
+        format!("{:.2} MB", size as f64 / MB as f64)
+    } else {
+        format!("{:.2} GB", size as f64 / GB as f64)
+    }
+}
+
+fn file_size_is_large(file_url: &String) -> Result<bool, io::Error> {
+    const LARGE_SIZE: u64 = 100 * 1024 * 1024;
+    let url = Url::parse(file_url).expect("Invalid URL");
+    if url.scheme() == "file" {
+        let path_str = url.path().replace("%20", " ");
+        let path = Path::new(&path_str);
+        match fs::metadata(path) {
+            Ok(metadata) => {
+                if metadata.is_file() {
+                    return Ok(metadata.len() > LARGE_SIZE)
+                } else {
+                    Ok(false)
+                }
+            }
+            Err(e) => {
+                Err(e)
+            }
+        }
+    }else {
+        Ok(false)
+    }
+}
 
 #[cfg(test)]
 mod tests {
-    use std::thread;
-    use std::time::Duration;
-    use cocoa::appkit::{NSApp, NSApplication, NSImage, NSPasteboard};
+    use crate::schema::clipboard::ContentType;
+    use cocoa::appkit::{NSImage, NSPasteboard};
     use cocoa::base::{id, nil};
-    use cocoa::foundation::{NSArray, NSAutoreleasePool, NSData, NSString, NSURL};
-    use objc::runtime::{Object, Sel};
-    use objc::declare::ClassDecl;
+    use cocoa::foundation::{NSArray, NSData, NSString, NSURL};
     use objc::{msg_send, sel, sel_impl};
-    use std::ptr;
-    use crate::core::pasteboard::{ContentType, Pasteboard};
 
     #[test]
     fn test_build() {
@@ -241,7 +265,7 @@ mod tests {
         }
     }
 
-       #[test]
+    #[test]
     fn set_contents_file() {
         // 获取上上个剪切板内容
         unsafe {
@@ -252,15 +276,15 @@ mod tests {
             pasteboard.clearContents();
 
             // let file_path = NSString::alloc(nil).init_str("/Users/zeke/Downloads/表格问答功能测试反馈-0626.xlsx");
-            let file_path = NSString::alloc(nil).init_str("/Users/zeke/Downloads/iShot2024-06-26 16.48.00.png");
+            let file_path =
+                NSString::alloc(nil).init_str("/Users/zeke/Downloads/iShot2024-06-26 16.48.00.png");
             let file_url = NSURL::fileURLWithPath_(nil, file_path);
             let objects = NSArray::arrayWithObject(nil, file_url);
             let _: bool = msg_send![pasteboard, writeObjects: objects];
-
         }
     }
 
-       #[test]
+    #[test]
     fn set_contents_png() {
         // 获取上上个剪切板内容
         unsafe {
@@ -270,7 +294,8 @@ mod tests {
             // 清除剪切板内容
             pasteboard.clearContents();
 
-            let image_path = NSString::alloc(nil).init_str("/Users/zeke/Downloads/iShot2024-06-26 16.48.00.png");
+            let image_path =
+                NSString::alloc(nil).init_str("/Users/zeke/Downloads/iShot2024-06-26 16.48.00.png");
             let image_url = NSURL::fileURLWithPath_(nil, image_path);
             let image_data = NSData::dataWithContentsOfURL_(nil, image_url);
             let image = NSImage::initWithData_(NSImage::alloc(nil), image_data);
@@ -279,3 +304,23 @@ mod tests {
         }
     }
 }
+
+
+// 这些是 macOS 和 iOS 开发中使用的 `NSPasteboard`（在 iOS 中称为 `UIPasteboard`）的类型标识符。每个类型标识符代表一种可以在剪贴板中存储的数据格式。以下是每个类型的含义：
+//
+// 1. **NSPasteboardTypeString**: 表示纯文本字符串。
+// 2. **NSPasteboardTypePDF**: 表示 PDF 文档数据。
+// 3. **NSPasteboardTypeTIFF**: 表示 TIFF 图像数据。
+// 4. **NSPasteboardTypePNG**: 表示 PNG 图像数据。
+// 5. **NSPasteboardTypeRTF**: 表示富文本格式（Rich Text Format）数据。
+// 6. **NSPasteboardTypeRTFD**: 表示富文本格式文档（Rich Text Format Document）数据。
+// 7. **NSPasteboardTypeHTML**: 表示 HTML 格式的数据。
+// 8. **NSPasteboardTypeTabularText**: 表示表格文本数据。
+// 9. **NSPasteboardTypeFont**: 表示字体数据。
+// 10. **NSPasteboardTypeRuler**: 表示标尺数据（通常用于文本编辑器中的缩进和制表符设置）。
+// 11. **NSPasteboardTypeColor**: 表示颜色数据。
+// 12. **NSPasteboardTypeSound**: 表示声音数据。
+// 13. **NSPasteboardTypeMultipleTextSelection**: 表示多重文本选择数据。
+// 14. **NSPasteboardTypeFindPanelSearchOptions**: 表示查找面板搜索选项数据。
+//
+// 这些类型标识符用于在应用程序之间传递和共享数据，确保数据以正确的格式被读取和处理。

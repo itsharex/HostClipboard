@@ -1,10 +1,18 @@
 const {
     app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain,
 } = require("electron");
+
 const path = require("path");
+const {initializeClipboardHelper, getClipboardContent} = require("./clipboardHelper");
 
 let mainWindow;
 let tray = null;
+
+async function sendClipboardContent(content) {
+    const items = await getClipboardContent();
+    mainWindow.webContents.send("list-items", items);
+    console.log(items)
+}
 
 function hideAndClearWindow() {
     if (mainWindow) {
@@ -13,7 +21,7 @@ function hideAndClearWindow() {
     }
 }
 
-function createWindow() {
+async function createWindow() {
     mainWindow = new BrowserWindow({
         width: 800, height: 600, webPreferences: {
             preload: path.join(__dirname, "preload.js"),
@@ -28,8 +36,8 @@ function createWindow() {
 
     mainWindow.loadFile("pages/index.html");
     // 发送数据到渲染进程
-    mainWindow.webContents.on("did-finish-load", () => {
-        mainWindow.webContents.send("list-items", ["Item 1", "Item 2", "Item 3"]);
+    mainWindow.webContents.on("did-finish-load", async () => {
+        await sendClipboardContent();
     });
 
     if (process.platform === 'darwin') {
@@ -77,11 +85,13 @@ function createWindow() {
 
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    await initializeClipboardHelper();
     createWindow();
 
     // 注册全局快捷键
-    globalShortcut.register("CommandOrControl+Shift+L", () => {
+    globalShortcut.register("CommandOrControl+Shift+L", async () => {
+        await sendClipboardContent();
         if (mainWindow) {
             if (mainWindow.isVisible()) {
                 hideAndClearWindow();
@@ -99,8 +109,8 @@ app.whenReady().then(() => {
         hideAndClearWindow();
     });
 
-    app.on("activate", function () {
-        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    app.on("activate", async function () {
+        if (BrowserWindow.getAllWindows().length === 0) await createWindow();
     });
 });
 
