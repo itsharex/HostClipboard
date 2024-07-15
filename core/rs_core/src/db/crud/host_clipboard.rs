@@ -2,6 +2,8 @@ use crate::db::entities::host_clipboard::{self, Entity as ClipboardEntries};
 use crate::schema::clipboard::PasteboardContent;
 use sea_orm::ActiveValue::Set;
 use sea_orm::*;
+use sea_orm_migration::seaql_migrations::Column;
+
 pub async fn add_clipboard_entry(
     db: &DatabaseConnection,
     item: PasteboardContent,
@@ -28,6 +30,16 @@ pub async fn get_clipboard_entries(
     db: &DatabaseConnection,
 ) -> Result<Vec<host_clipboard::Model>, DbErr> {
     ClipboardEntries::find().all(db).await
+}
+pub async fn get_clipboard_entries_by_num(
+    db: &DatabaseConnection,
+    num: Option<u64>,
+) -> Result<Vec<host_clipboard::Model>, DbErr> {
+    ClipboardEntries::find()
+        .order_by_desc(host_clipboard::Column::Id)
+        .limit(num)
+        .all(db)
+        .await
 }
 
 // pub async fn update_clipboard_entry(

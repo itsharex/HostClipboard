@@ -122,11 +122,32 @@ impl ClipboardHelper {
         Ok(db.as_ref().unwrap().clone())
     }
 
-    async fn get_clipboard_entries(
+    async fn get_all_clipboard_entries(
         &self,
     ) -> Result<Vec<ClipboardEntry>, Box<dyn std::error::Error>> {
         let db = self.get_db().await?;
         let all_entries = crud::host_clipboard::get_clipboard_entries(&db).await?;
+
+        Ok(all_entries
+            .into_iter()
+            .map(|entry| ClipboardEntry {
+                id: entry.id,
+                r#type: entry.r#type,
+                path: entry.path,
+                content: entry.content,
+                timestamp: entry.timestamp,
+                uuid: entry.uuid,
+            })
+            .collect())
+    }
+
+    async fn get_num_clipboard_entries(
+        &self,
+        num: i64,
+    ) -> Result<Vec<ClipboardEntry>, Box<dyn std::error::Error>> {
+        let db = self.get_db().await?;
+        let opt_num = if num > 0 { Some(num as u64) } else { None };
+        let all_entries = crud::host_clipboard::get_clipboard_entries_by_num(&db, opt_num).await?;
 
         Ok(all_entries
             .into_iter()
@@ -156,10 +177,20 @@ impl JsClipboardHelper {
     }
 
     #[napi]
-    pub async fn get_clipboard_entries(&self) -> napi::Result<ClipboardList> {
+    pub async fn get_all_clipboard_entries(&self) -> napi::Result<ClipboardList> {
         let entries = self
             .0
-            .get_clipboard_entries()
+            .get_all_clipboard_entries()
+            .await
+            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+        Ok(ClipboardList { entries })
+    }
+
+    #[napi]
+    pub async fn get_num_clipboard_entries(&self, num: i64) -> napi::Result<ClipboardList> {
+        let entries = self
+            .0
+            .get_num_clipboard_entries(num)
             .await
             .map_err(|e| napi::Error::from_reason(e.to_string()))?;
         Ok(ClipboardList { entries })

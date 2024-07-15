@@ -129,3 +129,4 @@ package-lock.json
 .vscode/
 
 server_data
+yarn.lock

@@ -1,5 +1,5 @@
 // clipboardHelper.js
-const nativeBinding = require("/Users/zeke/work/workspace/github_work/HostClipboard/core/rs_core/hello.darwin-arm64.node");
+const nativeBinding = require("/Users/zeke/work/py_work/HostClipboard/core/rs_core/hello.darwin-x64.node");
 
 let clipboardHelper;
 
@@ -10,15 +10,20 @@ async function initializeClipboardHelper() {
 
 async function getClipboardContent() {
     const result = [];
-    const clipboardList = await clipboardHelper.getClipboardEntries();
-    for (const item of clipboardList.entries) {
-        result.push(item.content);
-    }
-    // 返回倒叙
-    return result.reverse();
+    const clipboardList = await clipboardHelper.getNumClipboardEntries(5);
+    console.log(clipboardList);
+    const sortedEntries = clipboardList.entries.sort(
+        (a, b) => b.timestamp - a.timestamp,
+    );
+
+    // 提取 content
+    const contentList = sortedEntries.map((item) => item.content);
+    console.log(contentList);
+
+    return contentList;
 }
 
 module.exports = {
     initializeClipboardHelper,
-    getClipboardContent
+    getClipboardContent,
 };

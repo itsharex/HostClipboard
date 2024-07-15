@@ -61,7 +61,7 @@
     "email": "zeke.chin@icloud.com"
   },
   "engines": {
-    "node": ">=20.15"
+    "node": ">=20"
   },
   "license": "MIT",
   "devDependencies": {

@@ -16,6 +16,7 @@ export interface ClipboardList {
 }
 export declare class JsClipboardHelper {
   static new(dbPath: string): Promise<JsClipboardHelper>
-  getClipboardEntries(): Promise<ClipboardList>
+  getAllClipboardEntries(): Promise<ClipboardList>
+  getNumClipboardEntries(num: number): Promise<ClipboardList>
   nowGetContent(): Promise<void>
 }

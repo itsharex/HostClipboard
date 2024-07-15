@@ -62,7 +62,7 @@ impl PartialEq for ContentType {
 
 fn get_local_path(
     date_time: &DateTime<FixedOffset>,
-    suffix: &String,
+    suffix: &str,
 ) -> Result<String, io::Error> {
     let root_file_path = format!(
         "/Users/zeke/.cache/host-clipboard/files/{}{}{}",
@@ -94,43 +94,47 @@ impl PasteboardContent {
         let date_time = utils::time::get_current_date_time();
 
         // 定义text_content
-        let suffix: String;
-        let tc = match content_type {
+        let (text_content_show, path): (String, String);
+
+        match content_type {
             ContentType::Text => {
-                suffix = "txt".to_string();
-                text_content
+                path = match &content {
+                    Some(data) => {
+                        let suffix = "txt";
+                        get_local_path(&date_time, suffix).unwrap()
+                    }
+                    _ => "".to_string()
+                };
+                text_content_show = text_content
             }
             ContentType::PBImage => {
-                let parts: Vec<&str> = text_content.split('.').collect();
-                let size = parts.iter()
-                    .take(parts.len().saturating_sub(1))
-                    .cloned()
-                    .collect::<Vec<&str>>()
-                    .join(".");
-                suffix = parts[parts.len() - 1].to_string();
-                format!("{}: ({})", content_type.to_string(), size)
+                let suffix = text_content;
+                let size = match &content {
+                    Some(data) => {
+                        utils::file::format_size(data.len())
+                    }
+                    _ => "".to_string()
+                };
+
+                path = get_local_path(&date_time, &suffix).unwrap();
+                text_content_show = format!("{}: ({})", content_type.to_string(), size)
             }
             ContentType::File | ContentType::FileImage => {
-                let parts: Vec<&str> = text_content.split('.').collect();
-                let size = parts.iter()
-                    .take(parts.len().saturating_sub(1))
-                    .cloned()
-                    .collect::<Vec<&str>>()
-                    .join(".");
-                suffix = parts[parts.len() - 1].to_string();
-                format!("{}: ({})", content_type.to_string(), size)
+                let size = utils::file::get_file_size(&text_content);
+                path = text_content;
+                text_content_show = format!("{}: {} ({})", content_type.to_string(), path, size)
             }
             _ => {
-                suffix = "other".to_string();
-                text_content
+                path = get_local_path(&date_time, "other").unwrap();
+                text_content_show = text_content
             }
         };
-        let path = get_local_path(&date_time, &suffix).unwrap();
+
 
         let safe_item = SafeObjcPtr::new(item);
 
         let pasteboard_content = Arc::new(Mutex::new(PasteboardContent {
-            text_content: tc,
+            text_content: text_content_show,
             content_type,
             content,
             path,
@@ -162,28 +166,15 @@ impl PasteboardContent {
 
     pub fn save_path(self) -> Result<(), io::Error> {
         // TODO: 存入路径
-        match self.content_type {
-            ContentType::Text => {
-                let data = self.text_content;
-                // 向local_path写入
-                let mut file = std::fs::File::create(self.path).unwrap();
-                file.write_all(data.as_bytes()).unwrap();
-            }
-            ContentType::File | ContentType::FileImage => {
-                match self.content {
-                    Some(data) => {
-                        let mut file = std::fs::File::create(self.path).unwrap();
-                        file.write_all(&data).unwrap();
-                    }
-                    _ => {}
-                }
-            }
-            _ => {
-                let data = self.content.unwrap();
-                // 向local_path写入
+        if self.path.is_empty() {
+            return Ok(());
+        }
+        match self.content {
+            Some(data) => {
                 let mut file = std::fs::File::create(self.path).unwrap();
                 file.write_all(&data).unwrap();
             }
+            _ => {}
         }
 
         Ok(())

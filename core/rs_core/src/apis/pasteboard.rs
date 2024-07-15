@@ -1,8 +1,9 @@
 extern crate chrono;
 
-use std::{fs, io};
+use std::{fs, io, mem};
 use std::path::Path;
 use crate::schema::clipboard::{ContentType, PasteboardContent};
+use crate::utils;
 use chrono::Local;
 use cocoa::appkit::{
     NSPasteboard, NSPasteboardTypeMultipleTextSelection, NSPasteboardTypePNG,
@@ -11,7 +12,7 @@ use cocoa::appkit::{
 use cocoa::base::{id, nil};
 use cocoa::foundation::{NSArray, NSString};
 use cocoa::foundation::{NSData, NSInteger};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use url::Url;
 
 #[link(name = "AppKit", kind = "framework")]
@@ -74,6 +75,9 @@ impl Pasteboard {
 impl Pasteboard {
     unsafe fn get_item(&self, item: id) -> Option<PasteboardContent> {
         // 优先检查文件 URL 类型
+        // 如果文件小于 3M 则转存
+        // 如果文件大于 3M 使用原始路径
+        // 先不存了，直接使用原始路径
         if let Some(file_url_str) = self.get_file_url(item) {
             let file_end = file_url_str.split('.').last().unwrap_or("");
             let img_extensions = ["png", "jpg", "jpeg", "bmp", "gif"];
@@ -82,27 +86,28 @@ impl Pasteboard {
             } else {
                 ContentType::File
             };
+            let url = Url::parse(&*file_url_str).expect("Invalid URL");
+            let path_str = url.to_file_path().unwrap().to_str().unwrap().to_string();
 
-            let rust_bytes: Option<Vec<u8>> = if file_size_is_large(&file_url_str).expect("判断文件大小失败") {
-                None
-            } else {
-                self.get_data(item, NSPasteboardTypeFileURL)
-            };
-            let pasteboard_content = PasteboardContent::new(file_url_str, content_type, rust_bytes, item);
+            let pasteboard_content = PasteboardContent::new(path_str, content_type, None, item);
             let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
             return Some(res);
         }
 
         // 检查多文本类型
+        // 如果文本小于 1024 则存放在数据库
+        // 如果文件大于 1024 则 截断+存原始文本文件
         if let Some(string) = self.get_multi_text_content(item) {
-            let pasteboard_content = PasteboardContent::new(string, ContentType::Text, None, item);
+            let (text, bytes) = string_is_large(string);
+            let pasteboard_content = PasteboardContent::new(text, ContentType::Text, bytes, item);
             let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
             return Some(res);
         }
 
         // 检查文本类型
         if let Some(string) = self.get_text_content(item) {
-            let pasteboard_content = PasteboardContent::new(string, ContentType::Text, None, item);
+            let (text, bytes) = string_is_large(string);
+            let pasteboard_content = PasteboardContent::new(text, ContentType::Text, bytes, item);
             let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
             return Some(res);
         }
@@ -111,18 +116,18 @@ impl Pasteboard {
         // 否则则是文件
         // 读取 item data
         if let Some(rust_bytes) = self.get_data(item, NSPasteboardTypeTIFF) {
-            let text_content = format!("{}.tiff", format_size(rust_bytes.len()));
+            let suffix = "tiff".to_string();
             let pasteboard_content =
-                PasteboardContent::new(text_content, ContentType::PBImage, Some(rust_bytes), item);
+                PasteboardContent::new(suffix, ContentType::PBImage, Some(rust_bytes), item);
             let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
             return Some(res);
         }
 
         // 读取 item data
         if let Some(rust_bytes) = self.get_data(item, NSPasteboardTypePNG) {
-            let text_content = format!("{}.png", format_size(rust_bytes.len()));
+            let suffix = "png".to_string();
             let pasteboard_content =
-                PasteboardContent::new(text_content, ContentType::PBImage, Some(rust_bytes), item);
+                PasteboardContent::new(suffix, ContentType::PBImage, Some(rust_bytes), item);
             let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
             return Some(res);
         }
@@ -142,9 +147,13 @@ impl Pasteboard {
         }
         let rust_bytes = file_url.UTF8String();
         Some(
-            std::ffi::CStr::from_ptr(rust_bytes)
-                .to_string_lossy()
-                .to_string(),
+            urlencoding::decode(
+                std::ffi::CStr::from_ptr(rust_bytes)
+                    .to_string_lossy()
+                    .as_ref()
+            )
+                .expect("UTF-8")
+                .into_owned()
         )
     }
 
@@ -175,7 +184,7 @@ impl Pasteboard {
     }
 
     unsafe fn get_data(&self, item: id, data_type: id) -> Option<Vec<u8>> {
-        let data: id = item.dataForType(data_type);
+            let data: id = item.dataForType(data_type);
         if data.is_null() {
             return None;
         }
@@ -190,21 +199,22 @@ impl Pasteboard {
     }
 }
 
-fn format_size(size: usize) -> String {
-    const KB: usize = 1024;
-    const MB: usize = 1024 * KB;
-    const GB: usize = 1024 * MB;
 
-    if size < KB {
-        format!("{} B", size)
-    } else if size < MB {
-        format!("{:.2} KB", size as f64 / KB as f64)
-    } else if size < GB {
-        format!("{:.2} MB", size as f64 / MB as f64)
+fn string_is_large(input: String) -> (String, Option<Vec<u8>>) {
+    const LARGE_SIZE: usize = 1024;
+    let input_len = input.len();
+
+    if input_len > LARGE_SIZE {
+        // Truncate to the first 500 characters for simplicity.
+        let truncated_input = &input[..input.char_indices().nth(LARGE_SIZE as usize).map_or(input_len, |i| i.0)];
+        // Return the truncated string and the length of the original string in bytes as an Option.
+        return (truncated_input.to_string(), Some(input.clone().into_bytes()));
     } else {
-        format!("{:.2} GB", size as f64 / GB as f64)
+        // Return the original string and None since it's under the size limit.
+        (input, None)
     }
 }
+
 
 fn file_size_is_large(file_url: &String) -> Result<bool, io::Error> {
     const LARGE_SIZE: u64 = 100 * 1024 * 1024;
@@ -215,7 +225,7 @@ fn file_size_is_large(file_url: &String) -> Result<bool, io::Error> {
         match fs::metadata(path) {
             Ok(metadata) => {
                 if metadata.is_file() {
-                    return Ok(metadata.len() > LARGE_SIZE)
+                    return Ok(metadata.len() > LARGE_SIZE);
                 } else {
                     Ok(false)
                 }
@@ -224,7 +234,7 @@ fn file_size_is_large(file_url: &String) -> Result<bool, io::Error> {
                 Err(e)
             }
         }
-    }else {
+    } else {
         Ok(false)
     }
 }
