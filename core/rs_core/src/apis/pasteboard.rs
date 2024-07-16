@@ -1,7 +1,5 @@
 extern crate chrono;
 
-use std::{fs, io, mem};
-use std::path::Path;
 use crate::schema::clipboard::{ContentType, PasteboardContent};
 use crate::utils;
 use chrono::Local;
@@ -10,9 +8,10 @@ use cocoa::appkit::{
     NSPasteboardTypeString, NSPasteboardTypeTIFF,
 };
 use cocoa::base::{id, nil};
-use cocoa::foundation::{NSArray, NSString};
-use cocoa::foundation::{NSData, NSInteger};
-use std::sync::{Arc};
+use cocoa::foundation::{NSArray, NSData, NSInteger, NSString};
+use std::path::Path;
+use std::sync::Arc;
+use std::{fs, io};
 use url::Url;
 
 #[link(name = "AppKit", kind = "framework")]
@@ -150,10 +149,10 @@ impl Pasteboard {
             urlencoding::decode(
                 std::ffi::CStr::from_ptr(rust_bytes)
                     .to_string_lossy()
-                    .as_ref()
+                    .as_ref(),
             )
-                .expect("UTF-8")
-                .into_owned()
+            .expect("UTF-8")
+            .into_owned(),
         )
     }
 
@@ -184,7 +183,7 @@ impl Pasteboard {
     }
 
     unsafe fn get_data(&self, item: id, data_type: id) -> Option<Vec<u8>> {
-            let data: id = item.dataForType(data_type);
+        let data: id = item.dataForType(data_type);
         if data.is_null() {
             return None;
         }
@@ -199,22 +198,26 @@ impl Pasteboard {
     }
 }
 
-
 fn string_is_large(input: String) -> (String, Option<Vec<u8>>) {
     const LARGE_SIZE: usize = 1024;
     let input_len = input.len();
 
     if input_len > LARGE_SIZE {
         // Truncate to the first 500 characters for simplicity.
-        let truncated_input = &input[..input.char_indices().nth(LARGE_SIZE as usize).map_or(input_len, |i| i.0)];
+        let truncated_input = &input[..input
+            .char_indices()
+            .nth(LARGE_SIZE as usize)
+            .map_or(input_len, |i| i.0)];
         // Return the truncated string and the length of the original string in bytes as an Option.
-        return (truncated_input.to_string(), Some(input.clone().into_bytes()));
+        return (
+            truncated_input.to_string(),
+            Some(input.clone().into_bytes()),
+        );
     } else {
         // Return the original string and None since it's under the size limit.
         (input, None)
     }
 }
-
 
 fn file_size_is_large(file_url: &String) -> Result<bool, io::Error> {
     const LARGE_SIZE: u64 = 100 * 1024 * 1024;
@@ -230,9 +233,7 @@ fn file_size_is_large(file_url: &String) -> Result<bool, io::Error> {
                     Ok(false)
                 }
             }
-            Err(e) => {
-                Err(e)
-            }
+            Err(e) => Err(e),
         }
     } else {
         Ok(false)
@@ -314,7 +315,6 @@ mod tests {
         }
     }
 }
-
 
 // 这些是 macOS 和 iOS 开发中使用的 `NSPasteboard`（在 iOS 中称为 `UIPasteboard`）的类型标识符。每个类型标识符代表一种可以在剪贴板中存储的数据格式。以下是每个类型的含义：
 //

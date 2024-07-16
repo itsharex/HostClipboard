@@ -1,16 +1,20 @@
 extern crate chrono;
+use crate::apis::safe_objc_ptr::SafeObjcPtr;
+use crate::time_it;
+use crate::tokio_time_it;
+use crate::utils;
+use crate::utils::config::CONFIG;
 use chrono::offset::FixedOffset;
 use chrono::DateTime;
 use chrono::Datelike;
+use cocoa::appkit::{NSPasteboardTypePNG, NSPasteboardTypeTIFF};
 use cocoa::base::nil;
+use log::debug;
 use std::cmp::PartialEq;
 use std::fmt;
 use std::io;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
-use cocoa::appkit::{NSPasteboardTypePNG, NSPasteboardTypeTIFF};
-use crate::apis::safe_objc_ptr::SafeObjcPtr;
-use crate::utils;
 
 #[derive(Debug, Clone)]
 pub enum ContentType {
@@ -60,16 +64,18 @@ impl PartialEq for ContentType {
     }
 }
 
-fn get_local_path(
-    date_time: &DateTime<FixedOffset>,
-    suffix: &str,
-) -> Result<String, io::Error> {
-    let root_file_path = format!(
-        "/Users/zeke/.cache/host-clipboard/files/{}{}{}",
-        date_time.year(),
-        date_time.month(),
-        date_time.day()
-    );
+fn get_local_path(date_time: &DateTime<FixedOffset>, suffix: &str) -> Result<String, io::Error> {
+    let root_file_path = CONFIG
+        .files_path
+        .join(format!(
+            "{}{}{}",
+            date_time.year(),
+            date_time.month(),
+            date_time.day()
+        ))
+        .to_str()
+        .unwrap()
+        .to_string();
     // 判断root_file_path 是否存在 不存在则递归创建
     if !std::path::Path::new(&root_file_path).exists() {
         std::fs::create_dir_all(&root_file_path).unwrap_or_else(|e| {
@@ -103,17 +109,15 @@ impl PasteboardContent {
                         let suffix = "txt";
                         get_local_path(&date_time, suffix).unwrap()
                     }
-                    _ => "".to_string()
+                    _ => "".to_string(),
                 };
                 text_content_show = text_content
             }
             ContentType::PBImage => {
                 let suffix = text_content;
                 let size = match &content {
-                    Some(data) => {
-                        utils::file::format_size(data.len())
-                    }
-                    _ => "".to_string()
+                    Some(data) => utils::file::format_size(data.len()),
+                    _ => "".to_string(),
                 };
 
                 path = get_local_path(&date_time, &suffix).unwrap();
@@ -129,7 +133,6 @@ impl PasteboardContent {
                 text_content_show = text_content
             }
         };
-
 
         let safe_item = SafeObjcPtr::new(item);
 
@@ -155,8 +158,8 @@ impl PasteboardContent {
 
     async fn async_save_path(pasteboard_content: Arc<Mutex<Self>>) -> Result<(), String> {
         let item = pasteboard_content.lock().unwrap().clone();
-        println!("启动 读取data的tokio,text_content: {}", item.text_content);
-        let result = item.save_path();
+        debug!("启动 读取data的tokio,text_content: {}", item.text_content);
+        let result = tokio_time_it!(|| item.save_path());
         if let Ok(()) = result {
             Ok(())
         } else {

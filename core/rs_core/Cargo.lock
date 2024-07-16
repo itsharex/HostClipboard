@@ -935,6 +935,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
 
 [[package]]
+name = "flexi_logger"
+version = "0.28.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cca927478b3747ba47f98af6ba0ac0daea4f12d12f55e9104071b3dc00276310"
+dependencies = [
+ "chrono",
+ "glob",
+ "log",
+ "nu-ansi-term",
+ "regex",
+ "thiserror",
+]
+
+[[package]]
 name = "fltk"
 version = "1.4.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1223,7 +1237,10 @@ dependencies = [
  "core-graphics",
  "crossbeam",
  "dirs",
+ "flexi_logger",
  "fltk",
+ "lazy_static",
+ "log",
  "migration",
  "napi",
  "napi-build",
@@ -1607,6 +1624,15 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "nu-ansi-term"
+version = "0.50.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd2800e1520bdc966782168a627aa5d1ad92e33b984bf7c7615d31280c83ff14"
+dependencies = [
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

@@ -1,10 +1,12 @@
-use std::path::Path;
-
+use log::{debug, info};
 use sea_orm::Database;
+use std::path::Path;
 
 use db::{connection::establish_connection, crud};
 
 use crate::apis::pasteboard::Pasteboard;
+use crate::utils::config::CONFIG;
+use crate::utils::logger::init_logger;
 
 mod apis;
 mod db;
@@ -13,18 +15,19 @@ mod utils;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let db_path = Path::new("/Users/zeke/.cache/host-clipboard/db/test.sqlite").expand_tilde()?;
+    init_logger();
+    let db_path = CONFIG.db_path.join("db.sqlite").expand_tilde()?;
     let db_url = format!("sqlite:{}", db_path.display());
-    println!("{}", db_url);
+    info!("{}", db_url);
     // 1. 判断数据库文件是否存在，不存在则创建
     if !db_path.exists() {
-        println!("文件不存在，开始创建数据库文件");
+        debug!("文件不存在，开始创建数据库文件");
         if let Some(parent) = db_path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
         tokio::fs::File::create(db_path).await?;
         Database::connect(&db_url).await?;
-        println!("Database file created.");
+        debug!("Database file created.");
     }
 
     let mut pasteboard = Pasteboard::new();
