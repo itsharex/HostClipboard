@@ -1,9 +1,18 @@
 const {
-    app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain,
+    app,
+    BrowserWindow,
+    Tray,
+    Menu,
+    globalShortcut,
+    ipcMain,
 } = require("electron");
 
 const path = require("path");
-const {initializeClipboardHelper, getClipboardContent} = require("./clipboardHelper");
+const {
+    initializeClipboardHelper,
+    getClipboardContent,
+    searchClipboard,
+} = require("./clipboardHelper");
 
 let mainWindow;
 let tray = null;
@@ -11,27 +20,30 @@ let tray = null;
 async function sendClipboardContent(content) {
     const items = await getClipboardContent();
     mainWindow.webContents.send("list-items", items);
-    console.log(items)
+    console.log(items);
 }
 
 function hideAndClearWindow() {
     if (mainWindow) {
         mainWindow.hide();
-        mainWindow.webContents.executeJavaScript('document.getElementById("text-input").value = ""'); // 清空输入框
+        mainWindow.webContents.executeJavaScript(
+            'document.getElementById("text-input").value = ""',
+        ); // 清空输入框
     }
 }
 
 async function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 800, height: 600, webPreferences: {
+        width: 800,
+        height: 600,
+        webPreferences: {
             preload: path.join(__dirname, "preload.js"),
             nodeIntegration: false, // 禁用 Node.js 集成
             contextIsolation: true, // 启用上下文隔离
         },
         // show: false, // 隐藏窗口
         frame: false, // 创建无边框窗口
-        icon: path.join(__dirname, 'icons/icon.png')  // 添加这一行，使用您的图标文件路径
-
+        icon: path.join(__dirname, "icons/icon.png"), // 添加这一行，使用您的图标文件路径
     });
 
     mainWindow.loadFile("pages/index.html");
@@ -40,28 +52,35 @@ async function createWindow() {
         await sendClipboardContent();
     });
 
-    if (process.platform === 'darwin') {
+    if (process.platform === "darwin") {
         app.dock.hide();
     }
 
     // 创建系统托盘图标
     if (!tray) {
         tray = new Tray(path.join(__dirname, "icons/bar_18x18.png")); // 替换为你的图标路径
-        const contextMenu = Menu.buildFromTemplate([{
-            label: "Show App", click: function () {
-                if (mainWindow) {
-                    mainWindow.show();
-                    mainWindow.webContents.executeJavaScript('document.getElementById("text-input").focus()');
-                } else {
-                    createWindow();
-                }
+        const contextMenu = Menu.buildFromTemplate([
+            {
+                label: "Show App",
+                click: function () {
+                    if (mainWindow) {
+                        mainWindow.show();
+                        mainWindow.webContents.executeJavaScript(
+                            'document.getElementById("text-input").focus()',
+                        );
+                    } else {
+                        createWindow();
+                    }
+                },
             },
-        }, {
-            label: "Quit", click: function () {
-                app.isQuitting = true;
-                app.quit();
+            {
+                label: "Quit",
+                click: function () {
+                    app.isQuitting = true;
+                    app.quit();
+                },
             },
-        },]);
+        ]);
         tray.setContextMenu(contextMenu);
         tray.setToolTip("This is my application.");
     }
@@ -81,8 +100,6 @@ async function createWindow() {
     mainWindow.on("blur", () => {
         hideAndClearWindow();
     });
-
-
 }
 
 app.whenReady().then(async () => {
@@ -97,7 +114,9 @@ app.whenReady().then(async () => {
                 hideAndClearWindow();
             } else {
                 mainWindow.show();
-                mainWindow.webContents.executeJavaScript('document.getElementById("text-input").focus()');
+                mainWindow.webContents.executeJavaScript(
+                    'document.getElementById("text-input").focus()',
+                );
             }
         } else {
             createWindow();
@@ -107,6 +126,11 @@ app.whenReady().then(async () => {
     // 监听渲染进程发送的 hide-and-clear-window 事件
     ipcMain.on("hide-and-clear-window", () => {
         hideAndClearWindow();
+    });
+
+    ipcMain.on("search-clipboard", async (event, query) => {
+        const items = await searchClipboard(query);
+        mainWindow.webContents.send("list-items", items);
     });
 
     app.on("activate", async function () {

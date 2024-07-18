@@ -1,38 +1,36 @@
 extern crate chrono;
-use crate::apis::safe_objc_ptr::SafeObjcPtr;
-use crate::time_it;
-use crate::tokio_time_it;
-use crate::utils;
-use crate::utils::config::CONFIG;
-use chrono::offset::FixedOffset;
-use chrono::DateTime;
-use chrono::Datelike;
-use cocoa::appkit::{NSPasteboardTypePNG, NSPasteboardTypeTIFF};
-use cocoa::base::nil;
-use log::debug;
 use std::cmp::PartialEq;
 use std::fmt;
 use std::io;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
+use chrono::Datelike;
+use chrono::DateTime;
+use chrono::offset::FixedOffset;
+use cocoa::appkit::{NSPasteboardTypePNG, NSPasteboardTypeTIFF};
+use cocoa::base::nil;
+use log::debug;
+
+use crate::apis::safe_objc_ptr::SafeObjcPtr;
+use crate::time_it;
+use crate::tokio_time_it;
+use crate::utils;
+use crate::utils::config::CONFIG;
+
 #[derive(Debug, Clone)]
 pub enum ContentType {
     Text,
+    Image,
     File,
-    FileImage,
-    PBImage,
-    PBOther,
 }
 
 impl ContentType {
     pub fn to_i32(&self) -> i32 {
         match self {
             ContentType::Text => 0,
-            ContentType::File => 10,
-            ContentType::FileImage => 11,
-            ContentType::PBImage => 21,
-            ContentType::PBOther => 22,
+            ContentType::Image => 1,
+            ContentType::File => 2,
         }
     }
 }
@@ -41,9 +39,7 @@ impl ToString for ContentType {
         match self {
             ContentType::Text => "Text".to_string(),
             ContentType::File => "File".to_string(),
-            ContentType::FileImage => "FileImage".to_string(),
-            ContentType::PBImage => "PBImage".to_string(),
-            ContentType::PBOther => "PBOther".to_string(),
+            ContentType::Image => "Image".to_string(),
         }
     }
 }
@@ -105,7 +101,7 @@ impl PasteboardContent {
         match content_type {
             ContentType::Text => {
                 path = match &content {
-                    Some(data) => {
+                    Some(_data) => {
                         let suffix = "txt";
                         get_local_path(&date_time, suffix).unwrap()
                     }
@@ -113,7 +109,7 @@ impl PasteboardContent {
                 };
                 text_content_show = text_content
             }
-            ContentType::PBImage => {
+            ContentType::Image => {
                 let suffix = text_content;
                 let size = match &content {
                     Some(data) => utils::file::format_size(data.len()),
@@ -123,14 +119,10 @@ impl PasteboardContent {
                 path = get_local_path(&date_time, &suffix).unwrap();
                 text_content_show = format!("{}: ({})", content_type.to_string(), size)
             }
-            ContentType::File | ContentType::FileImage => {
+            ContentType::File => {
                 let size = utils::file::get_file_size(&text_content);
                 path = text_content;
                 text_content_show = format!("{}: {} ({})", content_type.to_string(), path, size)
-            }
-            _ => {
-                path = get_local_path(&date_time, "other").unwrap();
-                text_content_show = text_content
             }
         };
 

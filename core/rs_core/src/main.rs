@@ -1,21 +1,24 @@
+use std::path::Path;
 use log::{debug, info};
 use sea_orm::Database;
-use std::path::Path;
 
 use db::{connection::establish_connection, crud};
 
 use crate::apis::pasteboard::Pasteboard;
+use crate::search_engine::indexer::ClipboardIndexer;
 use crate::utils::config::CONFIG;
-use crate::utils::logger::init_logger;
+use crate::utils::logger;
 
 mod apis;
 mod db;
 mod schema;
+mod search_engine;
 mod utils;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    init_logger();
+    logger::init_logger();
+
     let db_path = CONFIG.db_path.join("db.sqlite").expand_tilde()?;
     let db_url = format!("sqlite:{}", db_path.display());
     info!("{}", db_url);
@@ -32,13 +35,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut pasteboard = Pasteboard::new();
     let db = establish_connection(&db_url).await?;
+    let mut indexer = ClipboardIndexer::new(db.clone(), None).await;
+    // let search = indexer.search("sqlx", 10, None).await;
+    let search_results = tokio_time_it!(|| async { indexer.search("sqlx", 10, None).await.len() }).await;
+    debug!("{:?}", search_results);
     loop {
         unsafe {
             let content = pasteboard.get_contents();
             std::thread::sleep(std::time::Duration::from_millis(500));
-
             for c in content {
-                let new_entry = crud::host_clipboard::add_clipboard_entry(&db, c).await?;
+                let _new_entry = crud::host_clipboard::add_clipboard_entry(&db, c).await?;
             }
         }
     }

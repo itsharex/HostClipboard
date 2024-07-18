@@ -1,10 +1,12 @@
-use crate::utils::config::CONFIG;
 use flexi_logger::{
-    colored_opt_format, opt_format, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming,
+    Cleanup, colored_opt_format, Criterion, Duplicate, FileSpec, Logger, Naming, opt_format,
 };
 
+use crate::utils::config::CONFIG;
+
 pub fn init_logger() {
-    Logger::try_with_str("debug")
+    // Logger::try_with_str("debug, sqlx=warn")
+    Logger::try_with_str("debug, sqlx=warn")
         .unwrap()
         .log_to_file(FileSpec::default().directory(CONFIG.logs_path.to_str().unwrap()))
         .format_for_files(opt_format)
@@ -12,14 +14,12 @@ pub fn init_logger() {
         .rotate(
             Criterion::Size(10 * 1024 * 1024), // 按大小切分，10MB
             Naming::Timestamps,
-            Cleanup::KeepLogFiles(10), // 保留30个日志文件（大约一个月）
+            Cleanup::KeepLogFiles(10), // 保留10个日志文件
         )
         .duplicate_to_stderr(Duplicate::All)
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger init失败 err: {:?}", e));
 }
-
-
 
 #[macro_export]
 macro_rules! time_it {
@@ -29,7 +29,7 @@ macro_rules! time_it {
         let elapsed_micros = duration.as_micros();
         let elapsed_secs = duration.as_secs_f64();
         debug!(
-            "location={}:{} elapsed={}µs elapsed_secs={:.6e}",
+            "file={}:{} elapsed={}µs elapsed_secs={:.6e}",
             file!(),
             line!(),
             elapsed_micros,
@@ -39,6 +39,7 @@ macro_rules! time_it {
     }};
 }
 
+//tokio_time_it!(|| item.save_path());
 #[macro_export]
 macro_rules! tokio_time_it {
     ($func:expr) => {{

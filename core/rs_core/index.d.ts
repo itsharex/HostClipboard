@@ -19,4 +19,5 @@ export declare class JsClipboardHelper {
   getAllClipboardEntries(): Promise<ClipboardList>
   getNumClipboardEntries(num: number): Promise<ClipboardList>
   nowGetContent(): Promise<void>
+  search(query: string, n: number, contentType: number): Promise<ClipboardList>
 }

@@ -1,7 +1,9 @@
 extern crate chrono;
 
-use crate::schema::clipboard::{ContentType, PasteboardContent};
-use crate::utils;
+use std::{fs, io};
+use std::path::Path;
+use std::sync::Arc;
+
 use chrono::Local;
 use cocoa::appkit::{
     NSPasteboard, NSPasteboardTypeMultipleTextSelection, NSPasteboardTypePNG,
@@ -9,10 +11,9 @@ use cocoa::appkit::{
 };
 use cocoa::base::{id, nil};
 use cocoa::foundation::{NSArray, NSData, NSInteger, NSString};
-use std::path::Path;
-use std::sync::Arc;
-use std::{fs, io};
 use url::Url;
+
+use crate::schema::clipboard::{ContentType, PasteboardContent};
 
 #[link(name = "AppKit", kind = "framework")]
 extern "C" {
@@ -81,7 +82,7 @@ impl Pasteboard {
             let file_end = file_url_str.split('.').last().unwrap_or("");
             let img_extensions = ["png", "jpg", "jpeg", "bmp", "gif"];
             let content_type = if img_extensions.contains(&file_end.to_lowercase().as_str()) {
-                ContentType::FileImage
+                ContentType::Image
             } else {
                 ContentType::File
             };
@@ -117,7 +118,7 @@ impl Pasteboard {
         if let Some(rust_bytes) = self.get_data(item, NSPasteboardTypeTIFF) {
             let suffix = "tiff".to_string();
             let pasteboard_content =
-                PasteboardContent::new(suffix, ContentType::PBImage, Some(rust_bytes), item);
+                PasteboardContent::new(suffix, ContentType::Image, Some(rust_bytes), item);
             let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
             return Some(res);
         }
@@ -126,7 +127,7 @@ impl Pasteboard {
         if let Some(rust_bytes) = self.get_data(item, NSPasteboardTypePNG) {
             let suffix = "png".to_string();
             let pasteboard_content =
-                PasteboardContent::new(suffix, ContentType::PBImage, Some(rust_bytes), item);
+                PasteboardContent::new(suffix, ContentType::Image, Some(rust_bytes), item);
             let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
             return Some(res);
         }
@@ -134,7 +135,7 @@ impl Pasteboard {
         // 读取 item data
         let text_content = format!("{}.other", self.get_now_string());
         let pasteboard_content =
-            PasteboardContent::new(text_content, ContentType::PBOther, None, item);
+            PasteboardContent::new(text_content, ContentType::File, None, item);
         let res = Arc::clone(&pasteboard_content).lock().unwrap().clone();
         return Some(res);
     }
@@ -242,11 +243,12 @@ fn file_size_is_large(file_url: &String) -> Result<bool, io::Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::schema::clipboard::ContentType;
     use cocoa::appkit::{NSImage, NSPasteboard};
     use cocoa::base::{id, nil};
     use cocoa::foundation::{NSArray, NSData, NSString, NSURL};
     use objc::{msg_send, sel, sel_impl};
+
+    use crate::schema::clipboard::ContentType;
 
     #[test]
     fn test_build() {

@@ -1,16 +1,21 @@
+use log::debug;
 use napi_derive::napi;
 use sea_orm::Database;
 use std::path::Path;
 use std::sync::Arc;
+use tokio::sync::{mpsc, Mutex};
+
+use db::{connection::establish_connection, crud};
 
 use crate::apis::pasteboard::Pasteboard;
 use crate::schema::clipboard::PasteboardContent;
-use db::{connection::establish_connection, crud};
-use tokio::sync::{mpsc, Mutex};
+use crate::search_engine::indexer::ClipboardIndexer;
+use crate::utils::logger;
 
 mod apis;
 mod db;
 mod schema;
+mod search_engine;
 mod utils;
 
 #[napi(object)]
@@ -34,10 +39,12 @@ struct ClipboardHelper {
     db_path: String,
     sender: mpsc::Sender<PasteboardContent>,
     receiver: Arc<Mutex<mpsc::Receiver<PasteboardContent>>>,
+    indexer: Arc<ClipboardIndexer>,
 }
 
 impl ClipboardHelper {
     async fn new(db_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        logger::init_logger();
         let db_path = Path::new(db_path);
         let db_url = format!("sqlite:{}", db_path.display());
         let pasteboard = Arc::new(Mutex::new(Pasteboard::new()));
@@ -50,14 +57,18 @@ impl ClipboardHelper {
             Database::connect(&db_url).await?;
         }
 
+        let db = establish_connection(&db_url).await?;
+        let indexer = Arc::new(ClipboardIndexer::new(db.clone(), Some(3)).await);
+
         let (sender, receiver) = mpsc::channel(100); // 创建一个容量为100的通道
 
         let helper = Self {
             pasteboard,
-            db: Arc::new(Mutex::new(None)),
+            db: Arc::new(Mutex::new(Some(db))),
             db_path: db_url,
             sender,
             receiver: Arc::new(Mutex::new(receiver)),
+            indexer,
         };
 
         // 启动读取剪贴板的任务
@@ -100,6 +111,12 @@ impl ClipboardHelper {
                     }
                 }
             }
+        });
+
+        // Start the background update for the indexer
+        let indexer_clone = helper.indexer.clone();
+        tokio::spawn(async move {
+            indexer_clone.start_background_update().await;
         });
 
         Ok(helper)
@@ -161,6 +178,35 @@ impl ClipboardHelper {
             })
             .collect())
     }
+
+    async fn search(
+        &self,
+        query: &str,
+        n: usize,
+        content_type: i32,
+    ) -> Result<Vec<ClipboardEntry>, Box<dyn std::error::Error>> {
+        let doc_type = match content_type {
+            -1 => None,
+            _ => Some(content_type),
+        };
+        // debug!(
+        //     "query: {:?}, n: {:?},doc_type: {:?}",
+        //     query, n, content_type
+        // );
+        let results = self.indexer.search(query, n, doc_type).await;
+        // debug!("results: {:?}", results);
+        Ok(results
+            .into_iter()
+            .map(|entry| ClipboardEntry {
+                id: entry.id,
+                r#type: entry.r#type,
+                path: entry.path,
+                content: entry.content,
+                timestamp: entry.timestamp,
+                uuid: entry.uuid,
+            })
+            .collect())
+    }
 }
 
 #[napi]
@@ -200,5 +246,20 @@ impl JsClipboardHelper {
     pub async fn now_get_content(&self) -> napi::Result<()> {
         self.0.send_content().await;
         Ok(())
+    }
+
+    #[napi]
+    pub async fn search(
+        &self,
+        query: String,
+        n: u32,
+        content_type: i32,
+    ) -> napi::Result<ClipboardList> {
+        let entries = self
+            .0
+            .search(&query, n as usize, content_type)
+            .await
+            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+        Ok(ClipboardList { entries })
     }
 }

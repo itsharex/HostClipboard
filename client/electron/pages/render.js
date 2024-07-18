@@ -40,6 +40,7 @@ window.electron.ipcRenderer.on("list-items", (listItems) => {
 textInput.addEventListener("input", (e) => {
     const inputValue = e.target.value;
     displayContainer.textContent = `You typed: ${inputValue}`;
+    window.electron.searchClipboard(inputValue);
 });
 
 // 更新选中的列表项和右侧的显示内容

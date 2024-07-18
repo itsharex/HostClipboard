@@ -1,8 +1,8 @@
+use sea_orm::*;
+use sea_orm::ActiveValue::Set;
+
 use crate::db::entities::host_clipboard::{self, Entity as ClipboardEntries};
 use crate::schema::clipboard::PasteboardContent;
-use sea_orm::ActiveValue::Set;
-use sea_orm::*;
-use sea_orm_migration::seaql_migrations::Column;
 
 pub async fn add_clipboard_entry(
     db: &DatabaseConnection,
@@ -31,6 +31,7 @@ pub async fn get_clipboard_entries(
 ) -> Result<Vec<host_clipboard::Model>, DbErr> {
     ClipboardEntries::find().all(db).await
 }
+
 pub async fn get_clipboard_entries_by_num(
     db: &DatabaseConnection,
     num: Option<u64>,
@@ -41,6 +42,35 @@ pub async fn get_clipboard_entries_by_num(
         .all(db)
         .await
 }
+
+pub async fn get_clipboard_entries_by_gt_timestamp(
+    db: &DatabaseConnection,
+    timestamp: i64,
+) -> Result<Vec<host_clipboard::Model>, DbErr> {
+    let query = host_clipboard::Entity::find()
+        .filter(host_clipboard::Column::Timestamp.gt(timestamp))
+        .order_by_asc(host_clipboard::Column::Timestamp);
+
+
+    query.all(db).await
+}
+
+pub async fn get_clipboard_entries_by_id_list(
+    db: &DatabaseConnection,
+    id_list: Option<Vec<i32>>,
+) -> Result<Vec<host_clipboard::Model>, DbErr> {
+    match id_list {
+        Some(ids) if !ids.is_empty() => {
+            host_clipboard::Entity::find()
+                .filter(host_clipboard::Column::Id.is_in(ids))
+                .order_by_desc(host_clipboard::Column::Timestamp)
+                .all(db)
+                .await
+        },
+        _ => Ok(vec![]),
+    }
+}
+
 
 // pub async fn update_clipboard_entry(
 //     db: &DatabaseConnection,

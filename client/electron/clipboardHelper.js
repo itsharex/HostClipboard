@@ -18,12 +18,21 @@ async function getClipboardContent() {
 
     // 提取 content
     const contentList = sortedEntries.map((item) => item.content);
-    console.log(contentList);
+    // console.log(contentList);
 
+    return contentList;
+}
+
+async function searchClipboard(query) {
+    console.log("query", query);
+    const clipboardList = await clipboardHelper.search(query, 4, -1);
+    const contentList = clipboardList.entries.map((item) => item.content);
+    console.log("searchClipboard", contentList);
     return contentList;
 }
 
 module.exports = {
     initializeClipboardHelper,
     getClipboardContent,
+    searchClipboard,
 };
