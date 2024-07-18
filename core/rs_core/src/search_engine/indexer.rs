@@ -1,3 +1,4 @@
+use std::mem;
 use std::sync::Arc;
 use log::debug;
 use sea_orm::{DatabaseConnection, DbErr};
@@ -8,7 +9,7 @@ use crate::std_time_it;
 use crate::db::crud;
 use crate::db::entities::host_clipboard::Model;
 use crate::schema::clipboard::ContentType;
-use crate::search_engine::index_core::SearchEngine;
+use crate::search_engine::index_core::Trie;
 use crate::utils::time;
 
 pub struct ClipboardIndexer {
@@ -21,7 +22,6 @@ impl ClipboardIndexer {
         let down_days = down_days.unwrap_or(3);
         let mut index_manager = IndexManager::new(down_days);
         index_manager.load_recent_entries(&db).await.unwrap();
-        debug!("{:?}", index_manager.search_engine.documents);
         ClipboardIndexer {
             index_manager: Arc::new(Mutex::new(index_manager)),
             db,
@@ -32,7 +32,7 @@ impl ClipboardIndexer {
         let db = self.db.clone();
         let index_manager = self.index_manager.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(300));
+            let mut interval = tokio::time::interval(Duration::from_millis(300));
             loop {
                 interval.tick().await;
                 let mut index_manager = index_manager.lock().await;
@@ -51,17 +51,17 @@ impl ClipboardIndexer {
     ) -> Vec<Model> {
         let doc_type = doc_type;
         let index_manager = self.index_manager.lock().await;
-        let results = index_manager.search_engine.search(query, n, doc_type);
+        let results_id = index_manager.trie.search(query, n, doc_type);
         debug!("query: {:?}, n: {:?},doc_type: {:?}", query, n, doc_type);
-        debug!("{:?}", results);
-        crud::host_clipboard::get_clipboard_entries_by_id_list(&self.db, Some(results))
+        debug!("results_id: {:?}", results_id);
+        crud::host_clipboard::get_clipboard_entries_by_id_list(&self.db, Some(results_id))
             .await
             .unwrap_or_default()
     }
 }
 
 struct IndexManager {
-    search_engine: SearchEngine,
+    pub trie: Trie,
     last_update: i64, // 最新的索引的 时间戳
     down_days: i64,   // 最多保存多少天的索引 默认3天
 }
@@ -71,7 +71,7 @@ impl IndexManager {
         let down_days = down_days;
 
         IndexManager {
-            search_engine: SearchEngine::new(),
+            trie: Trie::new(),
             last_update: time::get_current_timestamp(),
             down_days,
         }
@@ -85,7 +85,8 @@ impl IndexManager {
             crud::host_clipboard::get_clipboard_entries_by_gt_timestamp(db, recent_ts).await?;
 
         for entry in recent_entries {
-            self.search_engine.add_document(entry);
+            debug!("insert: {:?}", entry.id);
+            self.trie.insert(entry);
         }
 
         self.last_update = now_ts;
@@ -109,29 +110,30 @@ impl IndexManager {
         let new_entries =
             crud::host_clipboard::get_clipboard_entries_by_gt_timestamp(db, self.last_update)
                 .await?;
-
+        // debug!("new_entries: {:?}", new_entries);
         for entry in new_entries {
-            std_time_it!(|| {self.search_engine.add_document(entry)});
+            debug!("inset: {}，trie size {:?} ", entry.id, mem::size_of_val(&self.trie));
+            std_time_it!(|| {self.trie.insert(entry)});
+            self.last_update = time::get_current_timestamp();
         }
 
-        self.last_update = time::get_current_timestamp();
-        self.remove_expired_entries();
+        // self.remove_expired_entries();
 
         Ok(())
     }
 
-    fn remove_expired_entries(&mut self) {
-        let expired_timestamp = time::get_current_timestamp() - (self.down_days * 24 * 60 * 60);
-        let mut expired_docs = Vec::new();
-
-        for (doc_id, doc) in self.search_engine.documents.iter() {
-            if doc.timestamp < expired_timestamp {
-                expired_docs.push(*doc_id);
-            }
-        }
-
-        for doc_id in expired_docs {
-            self.search_engine.remove_document(doc_id);
-        }
-    }
+    // fn remove_expired_entries(&mut self) {
+    //     let expired_timestamp = time::get_current_timestamp() - (self.down_days * 24 * 60 * 60);
+    //     let mut expired_docs = Vec::new();
+    //
+    //     for (doc_id, doc) in self.trie.documents.iter() {
+    //         if doc.timestamp < expired_timestamp {
+    //             expired_docs.push(*doc_id);
+    //         }
+    //     }
+    //
+    //     for doc_id in expired_docs {
+    //         self.trie.remove_document(doc_id);
+    //     }
+    // }
 }

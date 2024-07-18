@@ -36,8 +36,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pasteboard = Pasteboard::new();
     let db = establish_connection(&db_url).await?;
     let mut indexer = ClipboardIndexer::new(db.clone(), None).await;
+    let search_results = tokio_time_it!(|| async { indexer.search("Conn", 10, None).await.len() }).await;
+
     // let search = indexer.search("sqlx", 10, None).await;
-    let search_results = tokio_time_it!(|| async { indexer.search("sqlx", 10, None).await.len() }).await;
+    tokio::spawn(async move {
+        let _ = &indexer.start_background_update().await;
+    });
+
+
+
     debug!("{:?}", search_results);
     loop {
         unsafe {

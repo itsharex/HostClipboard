@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 
 use db::{connection::establish_connection, crud};
-
+// use crate::{tokio_time_it, time_it};
 use crate::apis::pasteboard::Pasteboard;
 use crate::schema::clipboard::PasteboardContent;
 use crate::search_engine::indexer::ClipboardIndexer;
@@ -17,6 +17,7 @@ mod db;
 mod schema;
 mod search_engine;
 mod utils;
+
 
 #[napi(object)]
 pub struct ClipboardEntry {
@@ -193,7 +194,7 @@ impl ClipboardHelper {
         //     "query: {:?}, n: {:?},doc_type: {:?}",
         //     query, n, content_type
         // );
-        let results = self.indexer.search(query, n, doc_type).await;
+        let results = tokio_time_it!(|| async{ self.indexer.search(query, n, doc_type).await}).await;
         // debug!("results: {:?}", results);
         Ok(results
             .into_iter()
