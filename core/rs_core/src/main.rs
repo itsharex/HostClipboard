@@ -1,13 +1,14 @@
-use std::path::Path;
-use log::{debug, info};
-use sea_orm::Database;
-
-use db::{connection::establish_connection, crud};
-
 use crate::apis::pasteboard::Pasteboard;
+use crate::db::connection::init_db_connection;
 use crate::search_engine::indexer::ClipboardIndexer;
 use crate::utils::config::CONFIG;
 use crate::utils::logger;
+use db::crud;
+use fltk::enums::Cursor::N;
+use log::{debug, info};
+use sea_orm::Database;
+use std::path::Path;
+use std::time::Duration;
 
 mod apis;
 mod db;
@@ -17,36 +18,23 @@ mod utils;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    logger::init_logger();
+    let _ = logger::init_logger(None, Some(2));
 
-    let db_path = CONFIG.db_path.join("db.sqlite").expand_tilde()?;
-    let db_url = format!("sqlite:{}", db_path.display());
-    info!("{}", db_url);
-    // 1. 判断数据库文件是否存在，不存在则创建
-    if !db_path.exists() {
-        debug!("文件不存在，开始创建数据库文件");
-        if let Some(parent) = db_path.parent() {
-            tokio::fs::create_dir_all(parent).await?;
-        }
-        tokio::fs::File::create(db_path).await?;
-        Database::connect(&db_url).await?;
-        debug!("Database file created.");
-    }
-
+    let db = init_db_connection(None).await?;
     let mut pasteboard = Pasteboard::new();
-    let db = establish_connection(&db_url).await?;
-    let mut indexer = ClipboardIndexer::new(db.clone(), None).await;
-    let search_results = tokio_time_it!(|| async { indexer.search("Conn", 10, None).await.len() }).await;
 
-    // let search = indexer.search("sqlx", 10, None).await;
+    let mut indexer = ClipboardIndexer::new(db.clone(), None).await;
+
+    let search_results =
+        tokio_time_it!(|| async { indexer.search("e", 10, None).await.len() }).await;
+
     tokio::spawn(async move {
         let _ = &indexer.start_background_update().await;
     });
 
-
-
     debug!("{:?}", search_results);
     loop {
+        // logger_handle.flush();
         unsafe {
             let content = pasteboard.get_contents();
             std::thread::sleep(std::time::Duration::from_millis(500));

@@ -20,7 +20,7 @@ let tray = null;
 async function sendClipboardContent(content) {
     const items = await getClipboardContent();
     mainWindow.webContents.send("list-items", items);
-    console.log(items);
+    // console.log(items);
 }
 
 function hideAndClearWindow() {

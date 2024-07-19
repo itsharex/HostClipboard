@@ -1,38 +1,50 @@
 // clipboardHelper.js
-const nativeBinding = require("/Users/zeke/work/workspace/github_work/HostClipboard/core/rs_core/hello.darwin-arm64.node");
+const nativeBinding = require("/Users/zeke/work/py_work/HostClipboard/core/rs_core/hello.darwin-x64.node");
 
 let clipboardHelper;
 
 async function initializeClipboardHelper() {
-  const dbPath = "/Users/zeke/work/workspace/wb_work/hello/test.db";
-  clipboardHelper = await nativeBinding.JsClipboardHelper.new(dbPath);
+    // Note: The new() method doesn't take a dbPath parameter anymore
+    // It optionally takes logLevel and sqlLevel
+    clipboardHelper = await nativeBinding.JsClipboardHelper.new(4, 2);
 }
 
 async function getClipboardContent() {
-  const result = [];
-  const clipboardList = await clipboardHelper.getNumClipboardEntries(5);
-  console.log(clipboardList);
-  const sortedEntries = clipboardList.entries.sort(
-    (a, b) => b.timestamp - a.timestamp,
-  );
+    // Assuming we want to get all entries (passing a large number)
+    const clipboardList = await clipboardHelper.getClipboardEntries(1000);
 
-  // 提取 content
-  const contentList = sortedEntries.map((item) => item.content);
-  // console.log(contentList);
+    const sortedEntries = clipboardList.entries.sort(
+        (a, b) => b.timestamp - a.timestamp,
+    );
 
-  return contentList;
+    // Extract content
+    const contentList = sortedEntries.map((item) => item.content);
+
+    return contentList;
 }
 
 async function searchClipboard(query) {
-  console.log("query", query);
-  const clipboardList = await clipboardHelper.search(query, 4, -1);
-  const contentList = clipboardList.entries.map((item) => item.content);
-  console.log("searchClipboard", contentList);
-  return contentList;
+    console.log("query", query);
+    // Using searchClipboardEntries instead of search
+    // Assuming we want to search all types (undefined for typeInt)
+    const clipboardList = await clipboardHelper.searchClipboardEntries(
+        query,
+        4,
+    );
+
+    const contentList = clipboardList.entries.map((item) => item.content);
+    // console.log("searchClipboard", contentList);
+
+    return contentList;
+}
+
+async function refreshClipboard() {
+    await clipboardHelper.refreshClipboard();
 }
 
 module.exports = {
-  initializeClipboardHelper,
-  getClipboardContent,
-  searchClipboard,
+    initializeClipboardHelper,
+    getClipboardContent,
+    searchClipboard,
+    refreshClipboard,
 };

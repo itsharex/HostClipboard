@@ -1,5 +1,5 @@
-use sea_orm::*;
 use sea_orm::ActiveValue::Set;
+use sea_orm::*;
 
 use crate::db::entities::host_clipboard::{self, Entity as ClipboardEntries};
 use crate::schema::clipboard::PasteboardContent;
@@ -26,21 +26,57 @@ pub async fn add_clipboard_entry(
         ))
 }
 
-pub async fn get_clipboard_entries(
-    db: &DatabaseConnection,
-) -> Result<Vec<host_clipboard::Model>, DbErr> {
-    ClipboardEntries::find().all(db).await
-}
+// pub async fn get_clipboard_entries(
+//     db: &DatabaseConnection,
+// ) -> Result<Vec<host_clipboard::Model>, DbErr> {
+//     ClipboardEntries::find().all(db).await
+// }
+//
+// pub async fn get_clipboard_entries_by_num(
+//     db: &DatabaseConnection,
+//     num: Option<u64>,
+// ) -> Result<Vec<host_clipboard::Model>, DbErr> {
+//     ClipboardEntries::find()
+//         .order_by_desc(host_clipboard::Column::Id)
+//         .limit(num)
+//         .all(db)
+//         .await
+// }
 
-pub async fn get_clipboard_entries_by_num(
+pub async fn get_num_clipboards_by_timestamp_and_type(
     db: &DatabaseConnection,
     num: Option<u64>,
+    type_int: Option<i32>,
 ) -> Result<Vec<host_clipboard::Model>, DbErr> {
-    ClipboardEntries::find()
-        .order_by_desc(host_clipboard::Column::Id)
-        .limit(num)
-        .all(db)
-        .await
+    let query = host_clipboard::Entity::find()
+        .order_by_desc(host_clipboard::Column::Timestamp)
+        .limit(num);
+    if let Some(type_int) = type_int {
+        query
+            .filter(host_clipboard::Column::Type.eq(type_int))
+            .all(db)
+            .await
+    } else {
+        query.all(db).await
+    }
+}
+
+pub async fn get_num_clipboards_by_timestamp_and_type_list(
+    db: &DatabaseConnection,
+    num: Option<u64>,
+    type_list: Option<Vec<i32>>,
+) -> Result<Vec<host_clipboard::Model>, DbErr> {
+    let query = host_clipboard::Entity::find()
+        .order_by_desc(host_clipboard::Column::Timestamp)
+        .limit(num);
+    if let Some(type_list) = type_list {
+        query
+            .filter(host_clipboard::Column::Type.is_in(type_list))
+            .all(db)
+            .await
+    } else {
+        query.all(db).await
+    }
 }
 
 pub async fn get_clipboard_entries_by_gt_timestamp(
@@ -50,7 +86,6 @@ pub async fn get_clipboard_entries_by_gt_timestamp(
     let query = host_clipboard::Entity::find()
         .filter(host_clipboard::Column::Timestamp.gt(timestamp))
         .order_by_asc(host_clipboard::Column::Timestamp);
-
 
     query.all(db).await
 }
@@ -66,11 +101,10 @@ pub async fn get_clipboard_entries_by_id_list(
                 .order_by_desc(host_clipboard::Column::Timestamp)
                 .all(db)
                 .await
-        },
+        }
         _ => Ok(vec![]),
     }
 }
-
 
 // pub async fn update_clipboard_entry(
 //     db: &DatabaseConnection,

@@ -15,9 +15,13 @@ export interface ClipboardList {
   entries: Array<ClipboardEntry>
 }
 export declare class JsClipboardHelper {
-  static new(dbPath: string): Promise<JsClipboardHelper>
-  getAllClipboardEntries(): Promise<ClipboardList>
-  getNumClipboardEntries(num: number): Promise<ClipboardList>
-  nowGetContent(): Promise<void>
-  search(query: string, n: number, contentType: number): Promise<ClipboardList>
+  static new(logLevel?: number, sqlLevel?: number): Promise<JsClipboardHelper>
+  refreshClipboard(): Promise<void>
+  getClipboardEntries(num: number, typeInt?: number | undefined): Promise<ClipboardList>
+  getClipboardEntriesByTypeList(num: number, typeList?: number[] | undefined): Promise<ClipboardList>
+  searchClipboardEntries(query: string, num: number, typeInt?: number | undefined): Promise<ClipboardList>
+  searchClipboardEntriesByTypeList(query: string, num: number, typeList?: number[] | undefined): Promise<ClipboardList>
+  setConfig(config: string): Promise<void>
+  getConfig(): Promise<void>
+  deleteEntryById(id: number): Promise<void>
 }

@@ -1,16 +1,17 @@
-use std::mem;
-use std::sync::Arc;
-use log::debug;
-use sea_orm::{DatabaseConnection, DbErr};
-use tokio::sync::Mutex;
-use tokio::time::{Duration, interval};
-use crate::time_it;
-use crate::std_time_it;
 use crate::db::crud;
 use crate::db::entities::host_clipboard::Model;
 use crate::schema::clipboard::ContentType;
 use crate::search_engine::index_core::Trie;
+use crate::{std_time_it, tokio_time_it};
+use crate::time_it;
 use crate::utils::time;
+use log::debug;
+use sea_orm::{DatabaseConnection, DbErr};
+use std::mem;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tokio::task;
+use tokio::time::{interval, Duration};
 
 pub struct ClipboardIndexer {
     index_manager: Arc<Mutex<IndexManager>>,
@@ -20,12 +21,14 @@ pub struct ClipboardIndexer {
 impl ClipboardIndexer {
     pub async fn new(db: DatabaseConnection, down_days: Option<i64>) -> Self {
         let down_days = down_days.unwrap_or(3);
-        let mut index_manager = IndexManager::new(down_days);
-        index_manager.load_recent_entries(&db).await.unwrap();
-        ClipboardIndexer {
-            index_manager: Arc::new(Mutex::new(index_manager)),
-            db,
+        let index_manager = IndexManager::new(down_days);
+        let index_manager = Arc::new(Mutex::new(index_manager));
+        {
+            let mut index_manager = index_manager.lock().await;
+            index_manager.load_recent_entries(&db).await.unwrap();
         }
+        debug!("new ClipboardIndexer: {:?} {}", db, down_days);
+        ClipboardIndexer { index_manager, db }
     }
 
     pub async fn start_background_update(&self) {
@@ -43,16 +46,30 @@ impl ClipboardIndexer {
         });
     }
 
-    pub async fn search(
+    pub async fn search(&self, query: &str, num: usize, type_int: Option<i32>) -> Vec<Model> {
+        let index_manager = self.index_manager.lock().await;
+        let trie = index_manager.trie.lock().await;
+        let results_id = trie.search(query, num, type_int);
+        debug!("query: {:?}, n: {:?},doc_type: {:?}", query, num, type_int);
+        debug!("results_id: {:?}", results_id);
+        crud::host_clipboard::get_clipboard_entries_by_id_list(&self.db, Some(results_id))
+            .await
+            .unwrap_or_default()
+    }
+
+    pub async fn search_by_type_list(
         &self,
         query: &str,
-        n: usize,
-        doc_type: Option<i32>,
+        num: usize,
+        type_list: Option<Vec<i32>>,
     ) -> Vec<Model> {
-        let doc_type = doc_type;
         let index_manager = self.index_manager.lock().await;
-        let results_id = index_manager.trie.search(query, n, doc_type);
-        debug!("query: {:?}, n: {:?},doc_type: {:?}", query, n, doc_type);
+        let trie = index_manager.trie.lock().await;
+        let results_id = trie.search_by_type_list(query, num, type_list.clone());
+        debug!(
+            "query: {:?}, n: {:?}, type_list: {:?}",
+            query, num, type_list
+        );
         debug!("results_id: {:?}", results_id);
         crud::host_clipboard::get_clipboard_entries_by_id_list(&self.db, Some(results_id))
             .await
@@ -61,32 +78,40 @@ impl ClipboardIndexer {
 }
 
 struct IndexManager {
-    pub trie: Trie,
-    last_update: i64, // 最新的索引的 时间戳
-    down_days: i64,   // 最多保存多少天的索引 默认3天
+    pub trie: Arc<Mutex<Trie>>,
+    last_update: i64,
+    down_days: i64,
 }
 
 impl IndexManager {
     fn new(down_days: i64) -> Self {
-        let down_days = down_days;
-
         IndexManager {
-            trie: Trie::new(),
+            trie: Arc::new(Mutex::new(Trie::new())),
             last_update: time::get_current_timestamp(),
             down_days,
         }
     }
 
-    // 加载最近的记录
     async fn load_recent_entries(&mut self, db: &DatabaseConnection) -> Result<(), DbErr> {
         let now_ts = time::get_current_timestamp();
         let recent_ts = now_ts - self.down_days * 24 * 60 * 60;
         let recent_entries =
             crud::host_clipboard::get_clipboard_entries_by_gt_timestamp(db, recent_ts).await?;
 
+        let mut handles = vec![];
+
         for entry in recent_entries {
-            debug!("insert: {:?}", entry.id);
-            self.trie.insert(entry);
+            let trie = Arc::clone(&self.trie);
+            let handle = task::spawn(async move {
+                debug!("insert: {:?}", entry.id);
+                let mut trie = trie.lock().await;
+                trie.insert(&entry);
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.await.expect("Task panicked");
         }
 
         self.last_update = now_ts;
@@ -94,9 +119,8 @@ impl IndexManager {
         Ok(())
     }
 
-    // 启动后台更新
     pub async fn start_background_update(&mut self, db: &DatabaseConnection) {
-        let mut interval = interval(Duration::from_secs(300)); // 每5分钟更新一次
+        let mut interval = interval(Duration::from_secs(300));
 
         loop {
             interval.tick().await;
@@ -110,30 +134,36 @@ impl IndexManager {
         let new_entries =
             crud::host_clipboard::get_clipboard_entries_by_gt_timestamp(db, self.last_update)
                 .await?;
-        // debug!("new_entries: {:?}", new_entries);
+
         for entry in new_entries {
-            debug!("inset: {}，trie size {:?} ", entry.id, mem::size_of_val(&self.trie));
-            std_time_it!(|| {self.trie.insert(entry)});
+            debug!(
+                "insert: {}，trie size {:?} ",
+                entry.id,
+                mem::size_of_val(&self.trie)
+            );
+            let trie = Arc::clone(&self.trie);
+            let mut trie = trie.lock().await;
+            trie.insert(&entry);
             self.last_update = time::get_current_timestamp();
         }
 
-        // self.remove_expired_entries();
+        self.remove_expired_entries(db).await;
 
         Ok(())
     }
 
-    // fn remove_expired_entries(&mut self) {
-    //     let expired_timestamp = time::get_current_timestamp() - (self.down_days * 24 * 60 * 60);
-    //     let mut expired_docs = Vec::new();
-    //
-    //     for (doc_id, doc) in self.trie.documents.iter() {
-    //         if doc.timestamp < expired_timestamp {
-    //             expired_docs.push(*doc_id);
-    //         }
-    //     }
-    //
-    //     for doc_id in expired_docs {
-    //         self.trie.remove_document(doc_id);
-    //     }
-    // }
+    async fn remove_expired_entries(&mut self, db: &DatabaseConnection) {
+        let expired_timestamp = time::get_current_timestamp() - (self.down_days * 24 * 60 * 60);
+        let expired_ids = {
+            let trie = self.trie.lock().await;
+            Some(trie.td_lt_ids(expired_timestamp).into_iter().collect())
+        };
+        let expired_doc = crud::host_clipboard::get_clipboard_entries_by_id_list(db, expired_ids)
+            .await
+            .unwrap_or_default();
+        for doc in expired_doc {
+            let mut trie = self.trie.lock().await;
+            trie.delete(&doc);
+        }
+    }
 }
