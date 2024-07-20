@@ -4,11 +4,11 @@ const displayContainer = document.getElementById("display-container");
 
 let selectedIndex = -1;
 let isKeyboardSelection = false;
-
 // 监听主进程发送的数据
 window.electron.ipcRenderer.on("list-items", (listItems) => {
     // 清空现有的列表项
     selectableList.innerHTML = "";
+    selectedIndex = -1; // Reset selected index each time list is updated
 
     // 使用 listItems 来填充列表
     listItems.forEach((item, index) => {
@@ -34,12 +34,13 @@ window.electron.ipcRenderer.on("list-items", (listItems) => {
 
         selectableList.appendChild(li);
     });
+    updateSelectedItem(); // Update the UI to reflect no selection
 });
 
 // 处理输入框的输入
 textInput.addEventListener("input", async (e) => {
     const inputValue = e.target.value;
-    displayContainer.textContent = `You typed: ${inputValue}`;
+    displayContainer.textContent = `${inputValue}`;
     if (inputValue.trim() !== "") {
         window.electron.searchClipboard(inputValue);
     } else {

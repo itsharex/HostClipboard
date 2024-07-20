@@ -22,7 +22,8 @@ if __name__ == '__main__':
         "preload.js",
         "pages/render.js",
         "pages/index.html",
-        "pages/styles.css"
+        "pages/styles.css",
+        "clipboardHelper.js"
     ]
     for file_name in file_names:
         file = root_path / file_name
