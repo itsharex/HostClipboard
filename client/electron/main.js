@@ -50,6 +50,9 @@ async function createWindow() {
     // 发送数据到渲染进程
     mainWindow.webContents.on("did-finish-load", async () => {
         await sendClipboardContent();
+        mainWindow.webContents.executeJavaScript(
+            'document.getElementById("text-input").focus()',
+        );
     });
 
     if (process.platform === "darwin") {
@@ -145,4 +148,9 @@ app.on("window-all-closed", function () {
 app.on("will-quit", () => {
     // 注销所有快捷键
     globalShortcut.unregisterAll();
+});
+
+ipcMain.on("get-clipboard-content", async (event) => {
+    const items = await getClipboardContent();
+    event.reply("list-items", items);
 });

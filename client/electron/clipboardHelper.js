@@ -1,5 +1,5 @@
 // clipboardHelper.js
-const nativeBinding = require("/Users/zeke/work/py_work/HostClipboard/core/rs_core/hello.darwin-x64.node");
+const nativeBinding = require("/Users/zeke/work/workspace/py_work/HostClipboard/core/rs_core/hello.darwin-x64.node");
 
 let clipboardHelper;
 

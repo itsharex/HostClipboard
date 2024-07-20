@@ -37,10 +37,15 @@ window.electron.ipcRenderer.on("list-items", (listItems) => {
 });
 
 // 处理输入框的输入
-textInput.addEventListener("input", (e) => {
+textInput.addEventListener("input", async (e) => {
     const inputValue = e.target.value;
     displayContainer.textContent = `You typed: ${inputValue}`;
-    window.electron.searchClipboard(inputValue);
+    if (inputValue.trim() !== "") {
+        window.electron.searchClipboard(inputValue);
+    } else {
+        const listItems = await window.electron.getClipboardContent(); // 这需要在 preload.js 中暴露新的方法
+        updateList(listItems);
+    }
 });
 
 // 更新选中的列表项和右侧的显示内容
@@ -49,7 +54,7 @@ function updateSelectedItem() {
     items.forEach((item, index) => {
         if (index === selectedIndex) {
             item.classList.add("selected");
-            displayContainer.textContent = `You selected: ${item.textContent}`;
+            displayContainer.textContent = `${item.textContent}`;
         } else {
             item.classList.remove("selected");
         }
