@@ -93,6 +93,7 @@ impl Trie {
             .collect();
 
         res.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        res.dedup_by(|a, b| a.0 == b.0);  // 添加这行来去重
         res.truncate(n);
         res.into_iter().map(|(id, _)| id).collect()
     }
@@ -399,5 +400,30 @@ mod tests {
         // 测试大小写不敏感
         let results = trie.search_by_type_list("APP", 5, Some(vec![1, 2]));
         assert_eq!(results, vec![4, 2, 3, 1]);
+    }
+
+    #[test]
+    fn test_bad_case() {
+        fn get_bad_case() -> (HashMap<i32, Model>, Vec<Model>) {
+            let docs = vec![
+                create_test_doc(1, "[2024-07-20 09:47:56.778839 +08:00] INFO [/Users/zeke/.cargo/registry/src/rsproxy.cn-0dccff568467c15b/sea-orm-migration-0.12.15/src/migrator.rs:374] No pending migrations", 0, 2),
+                create_test_doc(2, "/Users/zeke/.cargo/registry/src/rsproxy.cn-0dccff568467c15b/sea-orm-migration-0.12.15/src/migrator.rs:369", 1, 4),
+                create_test_doc(3, "initializeClipboardHelper", 1, 7),
+                create_test_doc(4, "work", 1, 8),
+                create_test_doc(5, "workspace", 1, 8),
+            ];
+            (
+                docs.clone().into_iter().map(|doc| (doc.id, doc)).collect(),
+                docs,
+            )
+        }
+        let mut trie = Trie::new();
+        let (docs_map, docs_vals) = get_bad_case();
+        for doc in &docs_vals {
+            trie.insert(doc);
+        }
+
+        let result = trie.search("i", 4, None);
+        assert_eq!(result, vec![3, 2, 1])
     }
 }
