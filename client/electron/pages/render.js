@@ -81,14 +81,20 @@ document.addEventListener("keydown", (e) => {
         e.preventDefault();
         isKeyboardSelection = true;
         document.body.style.cursor = "none";
-        // 去除所有元素的高亮状态
-        items.forEach((item) => item.classList.remove("selected"));
+
         if (e.key === "ArrowUp" && selectedIndex > 0) {
             selectedIndex--;
         } else if (e.key === "ArrowDown" && selectedIndex < items.length - 1) {
             selectedIndex++;
         }
+
         updateSelectedItem();
+        if (selectedIndex >= 0 && selectedIndex < items.length) {
+            items[selectedIndex].scrollIntoView({
+                // behavior: "smooth", // 平滑滚动
+                block: "nearest", // 最近边界，减少不必要的滚动
+            });
+        }
     } else if (e.key === "Enter") {
         if (selectedIndex !== -1) {
             const selectedItem = items[selectedIndex].textContent;
