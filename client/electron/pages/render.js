@@ -53,7 +53,10 @@ textInput.addEventListener("input", async (e) => {
 function updateSelectedItem() {
     const items = selectableList.querySelectorAll("li");
     items.forEach((item, index) => {
-        if (index === selectedIndex) {
+        if (
+            index === selectedIndex &&
+            (isKeyboardSelection || !isKeyboardSelection)
+        ) {
             item.classList.add("selected");
             displayContainer.textContent = `${item.textContent}`;
         } else {
@@ -75,25 +78,22 @@ function copyToClipboardAndHide(content) {
         });
 }
 
-// 监听键盘事件
+// 在键盘事件监听器中修改
 document.addEventListener("keydown", (e) => {
     const items = selectableList.querySelectorAll("li");
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         e.preventDefault();
         isKeyboardSelection = true;
         document.body.style.cursor = "none";
-
         if (e.key === "ArrowUp" && selectedIndex > 0) {
             selectedIndex--;
         } else if (e.key === "ArrowDown" && selectedIndex < items.length - 1) {
             selectedIndex++;
         }
-
         updateSelectedItem();
         if (selectedIndex >= 0 && selectedIndex < items.length) {
             items[selectedIndex].scrollIntoView({
-                // behavior: "smooth", // 平滑滚动
-                block: "nearest", // 最近边界，减少不必要的滚动
+                block: "nearest",
             });
         }
     } else if (e.key === "Enter") {
@@ -104,10 +104,12 @@ document.addEventListener("keydown", (e) => {
     }
 });
 
-// 监听鼠标事件
+// 修改鼠标移动事件监听器
 document.addEventListener("mousemove", () => {
-    isKeyboardSelection = false;
-    document.body.style.cursor = "auto";
+    if (isKeyboardSelection) {
+        isKeyboardSelection = false;
+        document.body.style.cursor = "auto";
+    }
 });
 
 updateSelectedItem();

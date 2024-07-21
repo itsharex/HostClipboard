@@ -281,24 +281,11 @@ impl JsClipboardHelper {
         Ok(ClipboardList { entries })
     }
 
-    #[napi]
-    pub async fn set_config(&self, config: String) -> napi::Result<()> {
-        // TODO: Implement set_config functionality
-        Err(napi::Error::from_reason("Not implemented"))
-    }
 
     #[napi]
-    pub async fn get_config(&self) -> napi::Result<()> {
+    pub async fn update_config(&self) -> napi::Result<()> {
         // TODO: Implement get_config functionality
         Err(napi::Error::from_reason("Not implemented"))
     }
 
-    #[napi]
-    pub async fn delete_entry_by_id(
-        &self,
-        #[napi(ts_arg_type = "number")] id: i32,
-    ) -> napi::Result<()> {
-        // TODO: Implement delete_by_id functionality
-        Err(napi::Error::from_reason("Not implemented"))
-    }
 }

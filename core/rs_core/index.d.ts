@@ -21,7 +21,6 @@ export declare class JsClipboardHelper {
   getClipboardEntriesByTypeList(num: number, typeList?: number[] | undefined): Promise<ClipboardList>
   searchClipboardEntries(query: string, num: number, typeInt?: number | undefined): Promise<ClipboardList>
   searchClipboardEntriesByTypeList(query: string, num: number, typeList?: number[] | undefined): Promise<ClipboardList>
-  setConfig(config: string): Promise<void>
-  getConfig(): Promise<void>
+  updateConfig(config: string): Promise<void>
   deleteEntryById(id: number): Promise<void>
 }
