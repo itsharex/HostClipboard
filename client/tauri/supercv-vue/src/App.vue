@@ -1,46 +1,37 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { invoke } from "@tauri-apps/api/tauri";
+import { ref, onMounted, computed, watch } from "vue";
 import { appWindow } from "@tauri-apps/api/window";
+import { ClipboardHelper, ClipboardEntry } from "./clipboardHelper";
 
 const textInput = ref("");
-const selectableList = ref<string[]>([]);
-const displayContent = ref("");
+const clipboardEntries = ref<ClipboardEntry[]>([]);
 const selectedIndex = ref(-1);
-let isKeyboardSelection = false;
+let isKeyboardSelection = ref(true);
+
+const displayContent = computed(() => {
+  if (selectedIndex.value >= 0 && selectedIndex.value < clipboardEntries.value.length) {
+    return clipboardEntries.value[selectedIndex.value].content;
+  }
+  return "";
+});
 
 async function getClipboardContent() {
   try {
-    const items = await invoke("get_clipboard_content");
-    selectableList.value = items as string[];
+    clipboardEntries.value = await ClipboardHelper.getClipboardEntries();
+    selectedIndex.value = -1; // Reset selection
   } catch (error) {
     console.error("Failed to get clipboard content:", error);
+    clipboardEntries.value = [];
   }
 }
 
 async function searchClipboard() {
-  if (textInput.value.trim() !== "") {
-    try {
-      const items = await invoke("search_clipboard", {
-        query: textInput.value,
-      });
-      selectableList.value = items as string[];
-    } catch (error) {
-      console.error("Failed to search clipboard:", error);
-    }
-  } else {
-    await getClipboardContent();
-  }
-}
-
-function updateSelectedItem() {
-  if (
-    selectedIndex.value >= 0 &&
-    selectedIndex.value < selectableList.value.length
-  ) {
-    displayContent.value = selectableList.value[selectedIndex.value];
-  } else {
-    displayContent.value = "";
+  try {
+    clipboardEntries.value = await ClipboardHelper.searchClipboardEntries(textInput.value);
+    selectedIndex.value = -1; // Reset selection
+  } catch (error) {
+    console.error("Failed to search clipboard content:", error);
+    clipboardEntries.value = [];
   }
 }
 
@@ -48,7 +39,7 @@ async function copyToClipboardAndHide(content: string) {
   try {
     await navigator.clipboard.writeText(content);
     console.log("Content copied to clipboard");
-    await invoke("toggle_window");
+    await appWindow.hide();
   } catch (err) {
     console.error("Failed to copy text or hide window: ", err);
   }
@@ -57,32 +48,27 @@ async function copyToClipboardAndHide(content: string) {
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === "ArrowUp" || e.key === "ArrowDown") {
     e.preventDefault();
-    isKeyboardSelection = true;
-    document.body.style.cursor = "none";
+    isKeyboardSelection.value = true;
     if (e.key === "ArrowUp" && selectedIndex.value > 0) {
       selectedIndex.value--;
     } else if (
       e.key === "ArrowDown" &&
-      selectedIndex.value < selectableList.value.length - 1
+      selectedIndex.value < clipboardEntries.value.length - 1
     ) {
       selectedIndex.value++;
     }
-    updateSelectedItem();
   } else if (e.key === "Enter") {
     if (selectedIndex.value !== -1) {
-      const selectedItem = selectableList.value[selectedIndex.value];
-      copyToClipboardAndHide(selectedItem);
+      const selectedItem = clipboardEntries.value[selectedIndex.value];
+      copyToClipboardAndHide(selectedItem.content);
     }
   } else if (e.key === "Escape") {
-    invoke("toggle_window");
+    appWindow.hide();
   }
 }
 
 function handleMouseMove() {
-  if (isKeyboardSelection) {
-    isKeyboardSelection = false;
-    document.body.style.cursor = "auto";
-  }
+  isKeyboardSelection.value = false;
 }
 
 const inputRef = ref<HTMLInputElement | null>(null);
@@ -92,49 +78,85 @@ onMounted(async () => {
   document.addEventListener("keydown", handleKeydown);
   document.addEventListener("mousemove", handleMouseMove);
 
-  // 监听窗口显示事件
   await appWindow.onFocusChanged(({ payload: focused }) => {
     if (focused) {
       textInput.value = "";
       getClipboardContent();
-      // 聚焦输入框
       inputRef.value?.focus();
     }
   });
 
-  // 初始聚焦
   inputRef.value?.focus();
 });
+
+watch(textInput, () => {
+  if (textInput.value.trim() !== "") {
+    searchClipboard();
+  } else {
+    getClipboardContent();
+  }
+});
+
+
+const selectedTimestamp = computed(() => {
+  if (selectedIndex.value >= 0 && selectedIndex.value < clipboardEntries.value.length) {
+    return clipboardEntries.value[selectedIndex.value].timestamp;
+  }
+  return null;
+});
+
+const formattedTimestamp = computed(() => {
+  if (selectedTimestamp.value) {
+    // 将秒转换为毫秒
+    const milliseconds = selectedTimestamp.value * 1000;
+    const date = new Date(milliseconds);
+
+    // 使用更易读的格式
+    const options: Intl.DateTimeFormatOptions = {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    };
+
+    return date.toLocaleString(undefined, options);
+  }
+  return "";
+});
+
 </script>
 
 <template>
   <div id="app">
     <div id="input-container">
-      <input ref="inputRef" v-model="textInput" type="text" id="text-input" placeholder="Enter text..."
-        @input="searchClipboard" />
+      <input ref="inputRef" v-model="textInput" type="text" id="text-input" placeholder="Enter text..." />
     </div>
     <div id="content-container">
       <div id="list-container">
         <ul id="selectable-list">
-          <li v-for="(item, index) in selectableList" :key="index" :class="{ selected: index === selectedIndex }"
+          <li v-for="(item, index) in clipboardEntries" :key="item.id" :class="{ selected: index === selectedIndex }"
             @click="() => {
               selectedIndex = index;
-              updateSelectedItem();
-              copyToClipboardAndHide(item);
-            }
-              " @mouseover="() => {
-                if (!isKeyboardSelection) {
-                  selectedIndex = index;
-                  updateSelectedItem();
-                }
+              copyToClipboardAndHide(item.content);
+            }" @mouseover="() => {
+              if (!isKeyboardSelection) {
+                selectedIndex = index;
               }
-                ">
-            {{ item }}
+            }">
+            {{ item.content }}
           </li>
         </ul>
       </div>
       <div id="display-container">
-        {{ displayContent }}
+        <div class="content-wrapper">
+          <pre>{{ displayContent }}</pre>
+        </div>
+        <div class="timestamp-wrapper">
+          <div class="timestamp" v-if="selectedTimestamp">{{ formattedTimestamp }}</div>
+        </div>
       </div>
     </div>
   </div>
@@ -182,12 +204,6 @@ html {
   border-right: 1px solid #ccc;
 }
 
-#display-container {
-  width: 50%;
-  padding: 10px;
-  overflow-y: auto;
-}
-
 #selectable-list {
   list-style-type: none;
   padding: 0;
@@ -203,9 +219,59 @@ html {
   text-overflow: ellipsis;
 }
 
-#selectable-list li:hover,
 #selectable-list li.selected {
   background-color: #4caf50;
   color: white;
+}
+
+#display-container {
+  width: 50%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.content-wrapper {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 10px;
+  padding-bottom: 40px;
+  /* 为时间戳留出空间 */
+}
+
+.content-wrapper pre {
+  font-size: 13.5px;
+  font-family: system-ui, sans-serif;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.timestamp-wrapper {
+  height: 30px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f0f0;
+  border-top: 1px solid #ccc;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+}
+
+.timestamp {
+  font-size: 15px;
+  color: #666;
+  padding: 2px 5px;
+  border-radius: 3px;
+  width: 200px;
+  /* 固定宽度 */
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>
