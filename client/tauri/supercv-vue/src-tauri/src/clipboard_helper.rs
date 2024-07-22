@@ -1,7 +1,8 @@
 use log::{debug, error};
 use sea_orm::DatabaseConnection;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex, Notify};
 
 use crate::apis::pasteboard::Pasteboard;
 use crate::db::connection::init_db_connection;
@@ -18,6 +19,8 @@ pub struct ClipboardHelper {
     sender: mpsc::Sender<PasteboardContent>,
     receiver: Arc<Mutex<mpsc::Receiver<PasteboardContent>>>,
     indexer: Arc<Mutex<Option<ClipboardIndexer>>>,
+    initialized: Arc<AtomicBool>,
+    init_notifier: Arc<Notify>,
 }
 
 impl ClipboardHelper {
@@ -29,6 +32,8 @@ impl ClipboardHelper {
             sender,
             receiver: Arc::new(Mutex::new(receiver)),
             indexer: Arc::new(Mutex::new(None)),
+            initialized: Arc::new(AtomicBool::new(false)),
+            init_notifier: Arc::new(Notify::new()),
         }
     }
 
@@ -85,7 +90,16 @@ impl ClipboardHelper {
             }
         });
 
+        self.initialized.store(true, Ordering::SeqCst);
+        self.init_notifier.notify_waiters();
+
         Ok(())
+    }
+
+    async fn ensure_initialized(&self) {
+        if !self.initialized.load(Ordering::SeqCst) {
+            self.init_notifier.notified().await;
+        }
     }
 
     async fn send_content(&self) {
@@ -102,6 +116,7 @@ impl ClipboardHelper {
         num: u64,
         type_list: Option<Vec<i32>>,
     ) -> Result<Vec<Model>, Box<dyn std::error::Error>> {
+        self.ensure_initialized().await;
         let db_guard = self.db.lock().await;
         let db = db_guard.as_ref().unwrap();
         let ts = utils::time::get_current_timestamp() - 3 * 24 * 60 * 60;
@@ -121,6 +136,7 @@ impl ClipboardHelper {
         num: u64,
         type_list: Option<Vec<i32>>,
     ) -> Result<Vec<Model>, Box<dyn std::error::Error>> {
+        self.ensure_initialized().await;
         // 首先获取锁
         let indexer_guard = self.indexer.lock().await;
 

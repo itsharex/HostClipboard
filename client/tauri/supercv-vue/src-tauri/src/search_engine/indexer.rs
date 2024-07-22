@@ -88,9 +88,10 @@ impl IndexManager {
         for entry in recent_entries {
             let trie = Arc::clone(&self.trie);
             let handle = task::spawn(async move {
-                debug!("insert: {:?}", entry.id);
+                debug!("insert: start {:?}", entry.id);
                 let mut trie = trie.lock().await;
                 trie.insert(&entry);
+                debug!("insert: end {:?}", entry.id);
             });
             handles.push(handle);
         }
@@ -98,7 +99,7 @@ impl IndexManager {
         for handle in handles {
             handle.await.expect("Task panicked");
         }
-
+        debug!("插入完成");
         self.last_update = now_ts;
 
         Ok(())
