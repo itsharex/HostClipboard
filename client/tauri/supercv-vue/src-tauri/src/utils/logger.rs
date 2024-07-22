@@ -22,7 +22,6 @@ pub fn init_logger(log_level: Option<i32>, sql_level: Option<i32>) {
         .duplicate_to_stderr(Duplicate::All)
         .start()
         .unwrap_or_else(|e| panic!("Logger init失败 err: {:?}", e));
-
 }
 
 pub fn convert_log(log_int: Option<i32>) -> String {
@@ -36,38 +35,46 @@ pub fn convert_log(log_int: Option<i32>) -> String {
         _ => "debug".to_string(),
     }
 }
-
 #[macro_export]
 macro_rules! time_it {
-    ($start:expr, $func:expr) => {{
-        let result = $func(); // 直接执行闭包
-        let duration = $start.elapsed();
-        let elapsed_micros = duration.as_micros();
-        let elapsed_secs = duration.as_secs_f64();
-        debug!(
-            "file={}:{} elapsed={}µs elapsed_secs={:.6e}",
-            file!(),
-            line!(),
-            elapsed_micros,
-            elapsed_secs
-        );
+    // 同步版本
+    // let result = time_it!(sync { sync_function() })();
+    (sync $func:expr) => {{
+        let start = std::time::Instant::now();
+        let result = $func;
+        let duration = start.elapsed();
+        time_it!(@log_duration, duration);
         result
     }};
-}
 
-//tokio_time_it!(|| item.save_path());
-#[macro_export]
-macro_rules! tokio_time_it {
-    ($func:expr) => {{
-        let start = tokio::time::Instant::now();
-        time_it!(start, $func)
+    // 异步版本
+    // let result = time_it!(async { async_function }).await;
+    (async $($body:tt)*) => {{
+        async {
+            let start = tokio::time::Instant::now();
+            let result = { $($body)* };
+            let duration = start.elapsed();
+            time_it!(@log_duration, duration);
+            result
+        }
     }};
-}
 
-#[macro_export]
-macro_rules! std_time_it {
-    ($func:expr) => {{
-        let start = std::time::Instant::now();
-        time_it!(start, $func)
+    // 内部用于记录日志的辅助宏
+    (@log_duration, $duration:expr) => {{
+        let nanos = $duration.as_nanos();
+        let (value, unit) = if nanos >= 1_000_000_000 {
+            (nanos as f64 / 1_000_000_000.0, "s")
+        } else if nanos >= 1_000_000 {
+            (nanos as f64 / 1_000_000.0, "ms")
+        } else if nanos >= 1_000 {
+            (nanos as f64 / 1_000.0, "µs")
+        } else {
+            (nanos as f64, "ns")
+        };
+
+        debug!(
+            "file={}:{} elapsed={:.3} {} elapsed_secs={:.6e}",
+            file!(), line!(), value, unit, $duration.as_secs_f64()
+        );
     }};
 }

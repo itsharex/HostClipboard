@@ -36,7 +36,7 @@ async fn main() {
         .setup(move |app| {
             let clipboard_helper = clipboard_helper_for_setup.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = clipboard_helper.init(None, Some(4)).await {
+                if let Err(e) = clipboard_helper.init(None, Some(2)).await {
                     eprintln!("Failed to initialize ClipboardHelper: {}", e);
                 }
             });

@@ -4,7 +4,6 @@ use crate::schema::clipboard::ContentType;
 use crate::search_engine::index_core::Trie;
 use crate::time_it;
 use crate::utils::time;
-use crate::{std_time_it, tokio_time_it};
 use log::debug;
 use sea_orm::{DatabaseConnection, DbErr};
 use std::mem;
@@ -20,14 +19,19 @@ pub struct ClipboardIndexer {
 
 impl ClipboardIndexer {
     pub async fn new(db: DatabaseConnection, down_days: Option<i64>) -> Self {
+        debug!("start");
         let down_days = down_days.unwrap_or(3);
         let index_manager = IndexManager::new(down_days);
+
         let index_manager = Arc::new(Mutex::new(index_manager));
-        {
-            let mut index_manager = index_manager.lock().await;
-            index_manager.load_recent_entries(&db).await.unwrap();
-        }
-        debug!("new ClipboardIndexer: {:?} {}", db, down_days);
+
+        time_it!(async {
+        let mut index_manager = index_manager.lock().await;
+        index_manager.load_recent_entries(&db).await.unwrap();
+    }).await;
+
+        debug!("end");
+
         ClipboardIndexer { index_manager, db }
     }
 
@@ -53,7 +57,7 @@ impl ClipboardIndexer {
         );
         let index_manager = self.index_manager.lock().await;
         let trie = index_manager.trie.lock().await;
-        let results_id = trie.search(query, num, type_list);
+        let results_id = time_it!(sync || trie.search(query, num, type_list))();
 
         debug!("results_id: {:?}", results_id);
         crud::host_clipboard::get_clipboard_entries_by_id_list(&self.db, Some(results_id))
@@ -83,15 +87,19 @@ impl IndexManager {
         let recent_entries =
             crud::host_clipboard::get_clipboard_entries_by_gt_timestamp(db, recent_ts).await?;
 
+        // let trie_handle = Arc::clone(&self.trie);
+        // let mut trie = trie_handle.lock().await;
+        // trie.insert_list(&recent_entries);
+
         let mut handles = vec![];
 
         for entry in recent_entries {
             let trie = Arc::clone(&self.trie);
             let handle = task::spawn(async move {
-                debug!("insert: start {:?}", entry.id);
+                // debug!("insert: start {:?}", entry.id);
                 let mut trie = trie.lock().await;
                 trie.insert(&entry);
-                debug!("insert: end {:?}", entry.id);
+                // debug!("insert: end {:?}", entry.id);
             });
             handles.push(handle);
         }
@@ -99,7 +107,8 @@ impl IndexManager {
         for handle in handles {
             handle.await.expect("Task panicked");
         }
-        debug!("插入完成");
+
+
         self.last_update = now_ts;
 
         Ok(())

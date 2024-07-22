@@ -28,9 +28,43 @@ impl Trie {
             timestamp_ids: BTreeMap::new(),
         }
     }
+
     pub fn insert(&mut self, doc: &Model) {
         self.td_insert(doc.timestamp, doc.id);
 
+        for (i, _) in doc.content.char_indices() {
+            let mut node = &mut self.root;
+            for ch in doc.content[i..].chars().flat_map(char::to_lowercase) {
+                node = node
+                    .children
+                    .entry(ch)
+                    .or_insert_with(|| Box::new(TrieNode::new()));
+                node.doc_ids.push((doc.id, doc.r#type, doc.timestamp));
+            }
+        }
+    }
+    pub fn insert_list(&mut self, doc_list: &[Model]) {
+        const BATCH_SIZE: usize = 1000;
+
+        // Batch insert timestamps and ids
+        for doc in doc_list {
+            self.td_insert(doc.timestamp, doc.id)
+        }
+
+        // Process documents in batches
+        for chunk in doc_list.chunks(BATCH_SIZE) {
+            let mut sorted_docs: Vec<_> = chunk.iter().collect();
+            sorted_docs.sort_unstable_by(|a, b| a.content.cmp(&b.content));
+
+            for doc in sorted_docs {
+                self.insert_doc(doc);
+            }
+        }
+    }
+
+
+    fn insert_doc(&mut self, doc: &Model) {
+        // 对文档的每个起始位置都创建一个完整的路径
         for (i, _) in doc.content.char_indices() {
             let mut node = &mut self.root;
             for ch in doc.content[i..].chars().flat_map(char::to_lowercase) {

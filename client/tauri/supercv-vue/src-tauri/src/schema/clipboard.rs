@@ -14,7 +14,6 @@ use log::debug;
 
 use crate::apis::safe_objc_ptr::SafeObjcPtr;
 use crate::time_it;
-use crate::tokio_time_it;
 use crate::utils;
 use crate::utils::config::CONFIG;
 
@@ -151,7 +150,7 @@ impl PasteboardContent {
     async fn async_save_path(pasteboard_content: Arc<Mutex<Self>>) -> Result<(), String> {
         let item = pasteboard_content.lock().unwrap().clone();
         debug!("启动 读取data的tokio,text_content: {}", item.text_content);
-        let result = tokio_time_it!(|| item.save_path());
+        let result = time_it!(sync|| item.save_path())();
         if let Ok(()) = result {
             Ok(())
         } else {

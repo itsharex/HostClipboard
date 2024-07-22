@@ -11,7 +11,7 @@ use crate::db::entities::host_clipboard::Model;
 use crate::schema::clipboard::PasteboardContent;
 use crate::search_engine::indexer::ClipboardIndexer;
 use crate::utils::logger;
-use crate::{time_it, tokio_time_it, utils};
+use crate::{time_it, utils};
 
 pub struct ClipboardHelper {
     pasteboard: Arc<Mutex<Pasteboard>>,
@@ -46,7 +46,7 @@ impl ClipboardHelper {
         let db = init_db_connection(None).await?;
         *self.db.lock().await = Some(db.clone());
 
-        let indexer = ClipboardIndexer::new(db, Some(3)).await;
+        let indexer = ClipboardIndexer::new(db, Some(10)).await;
         *self.indexer.lock().await = Some(indexer);
 
         // 启动读取剪贴板的任务

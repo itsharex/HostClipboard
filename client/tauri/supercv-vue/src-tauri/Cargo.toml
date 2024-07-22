@@ -43,6 +43,7 @@ flexi_logger = { version = "0.28.5", features = ["async"] }
 lazy_static = "1.5.0"
 env_logger = "0.11.3"
 unicode-segmentation = "1.11.0"
+rayon = "1.10.0"
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
