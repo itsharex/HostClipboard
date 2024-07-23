@@ -1,7 +1,5 @@
 extern crate chrono;
 
-use std::{fs, io};
-use std::path::Path;
 use std::sync::Arc;
 
 use chrono::Local;
@@ -217,27 +215,6 @@ fn string_is_large(input: String) -> (String, Option<Vec<u8>>) {
     } else {
         // Return the original string and None since it's under the size limit.
         (input, None)
-    }
-}
-
-fn file_size_is_large(file_url: &String) -> Result<bool, io::Error> {
-    const LARGE_SIZE: u64 = 100 * 1024 * 1024;
-    let url = Url::parse(file_url).expect("Invalid URL");
-    if url.scheme() == "file" {
-        let path_str = url.path().replace("%20", " ");
-        let path = Path::new(&path_str);
-        match fs::metadata(path) {
-            Ok(metadata) => {
-                if metadata.is_file() {
-                    return Ok(metadata.len() > LARGE_SIZE);
-                } else {
-                    Ok(false)
-                }
-            }
-            Err(e) => Err(e),
-        }
-    } else {
-        Ok(false)
     }
 }
 

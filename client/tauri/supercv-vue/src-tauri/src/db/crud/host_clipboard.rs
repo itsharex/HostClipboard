@@ -1,8 +1,9 @@
-use sea_orm::ActiveValue::Set;
-use sea_orm::*;
-
 use crate::db::entities::host_clipboard::{self, Entity as ClipboardEntries};
 use crate::schema::clipboard::PasteboardContent;
+use crate::utils::config::CONFIG;
+use sea_orm::sea_query::Expr;
+use sea_orm::ActiveValue::Set;
+use sea_orm::*;
 
 pub async fn add_clipboard_entry(
     db: &DatabaseConnection,
@@ -60,25 +61,52 @@ pub async fn add_clipboard_entry(
 //         query.all(db).await
 //     }
 // }
-
-pub async fn get_num_clipboards_by_timestamp_and_type_list(
+pub async fn get_clipboards_by_type_list(
     db: &DatabaseConnection,
     num: Option<u64>,
-    timestamp: i64,
     type_list: Option<Vec<i32>>,
 ) -> Result<Vec<host_clipboard::Model>, DbErr> {
-    let query = host_clipboard::Entity::find()
-        .filter(host_clipboard::Column::Timestamp.gt(timestamp))
-        .order_by_desc(host_clipboard::Column::Timestamp)
-        .limit(num);
+    let (text_ts, img_ts, file_ts) = {
+        let config = CONFIG.read().unwrap(); // 获取读锁
+        let (text_ts, img_ts, file_ts) = config.get_expired_ts();
+        (text_ts, img_ts, file_ts) // 将值返回给外部变量
+    };
+
+    let mut query = host_clipboard::Entity::find();
+
+    // 根据不同的类型指定不同的时间戳
+    query = query.filter(
+        Condition::any()
+            .add(
+                Expr::col(host_clipboard::Column::Type)
+                    .eq(0)
+                    .and(host_clipboard::Column::Timestamp.gt(text_ts)),
+            )
+            .add(
+                Expr::col(host_clipboard::Column::Type)
+                    .eq(1)
+                    .and(host_clipboard::Column::Timestamp.gt(img_ts)),
+            )
+            .add(
+                Expr::col(host_clipboard::Column::Type)
+                    .eq(2)
+                    .and(host_clipboard::Column::Timestamp.gt(file_ts)),
+            ),
+    );
+
+    // 如果提供了type_list，则添加类型过滤
     if let Some(type_list) = type_list {
-        query
-            .filter(host_clipboard::Column::Type.is_in(type_list))
-            .all(db)
-            .await
-    } else {
-        query.all(db).await
+        query = query.filter(host_clipboard::Column::Type.is_in(type_list));
     }
+
+    // 按时间戳降序排序并限制结果数量
+    query = query.order_by_desc(host_clipboard::Column::Timestamp);
+
+    if let Some(num) = num {
+        query = query.limit(num);
+    }
+
+    query.all(db).await
 }
 
 pub async fn get_clipboard_entries_by_gt_timestamp(
@@ -87,7 +115,7 @@ pub async fn get_clipboard_entries_by_gt_timestamp(
 ) -> Result<Vec<host_clipboard::Model>, DbErr> {
     let query = host_clipboard::Entity::find()
         .filter(host_clipboard::Column::Timestamp.gt(timestamp))
-        .order_by_asc(host_clipboard::Column::Timestamp);
+        .order_by_desc(host_clipboard::Column::Timestamp);
 
     query.all(db).await
 }

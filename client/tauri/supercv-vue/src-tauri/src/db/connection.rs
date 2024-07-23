@@ -1,4 +1,4 @@
-use crate::utils::config::CONFIG;
+use crate::utils::config::{CONFIG};
 use log::info;
 use migration::Migrator;
 use migration::MigratorTrait;
@@ -9,7 +9,7 @@ pub async fn init_db_connection(path: Option<&str>) -> Result<DatabaseConnection
     let db_path = if let Some(p) = path {
         Path::new(p).to_path_buf()
     } else {
-        CONFIG.db_path.join("db.sqlite")
+        CONFIG.read().unwrap().db_path.join("db.sqlite")
     };
 
     let db_url = format!("sqlite:{}", db_path.display());

@@ -3,17 +3,17 @@
     windows_subsystem = "windows"
 )]
 
+use log::debug;
 use std::sync::Arc;
 use tauri::GlobalShortcutManager;
 use tauri::Manager;
 use tauri::{CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu};
 
 use crate::clipboard_helper::{
-    rs_invoke_get_clipboards, rs_invoke_search_clipboards, ClipboardHelper,
+    rs_invoke_get_clipboards, rs_invoke_get_user_config, rs_invoke_is_initialized,
+    rs_invoke_search_clipboards, rs_invoke_set_user_config, ClipboardHelper,
 };
 
-// 这里应该引入你的 Rust 剪贴板助手库
-// use clipboard_helper::ClipboardHelper;
 mod apis;
 mod clipboard_helper;
 mod db;
@@ -29,23 +29,29 @@ async fn main() {
 
     let quit = CustomMenuItem::new("quit".to_string(), "退出");
     let show_window = CustomMenuItem::new("show_window".to_string(), "显示页面");
-    let tray_menu = SystemTrayMenu::new().add_item(show_window).add_item(quit);
+    let setting = CustomMenuItem::new("setting".to_string(), "设置");
+    let tray_menu = SystemTrayMenu::new()
+        .add_item(show_window)
+        .add_item(setting)
+        .add_item(quit);
     let system_tray = SystemTray::new().with_menu(tray_menu);
 
     tauri::Builder::default()
         .setup(move |app| {
             let clipboard_helper = clipboard_helper_for_setup.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = clipboard_helper.init(None, Some(2)).await {
+                let result = time_it!(async  clipboard_helper.init(None, Some(2)).await ).await;
+
+                if let Err(e) = result {
                     eprintln!("Failed to initialize ClipboardHelper: {}", e);
                 }
             });
-            let window = app.get_window("main").unwrap();
-            window.set_decorations(false).unwrap();
+            let window_main = app.get_window("main").unwrap();
+            window_main.set_decorations(false).unwrap();
 
             // 注册全局快捷键
             let mut global_shortcut = app.global_shortcut_manager();
-            let window_handle = window.clone();
+            let window_handle = window_main.clone();
             global_shortcut
                 .register("CommandOrControl+Shift+L", move || {
                     let window = window_handle.clone();
@@ -60,9 +66,22 @@ async fn main() {
                 })
                 .unwrap();
 
+            // let window_handle = window_main.clone();
+            // global_shortcut
+            //     .register("CommandOrControl+,", move || {
+            //         let window = window_handle.clone();
+            //         tauri::async_runtime::spawn(async move {
+            //             window.show().unwrap();
+            //             window.set_focus().unwrap();
+            //             // 触发切换到配置页面的事件
+            //             window.emit("toggle_config_page", ()).unwrap();
+            //         });
+            //     })
+            //     .unwrap();
+
             // 添加失去焦点事件处理
-            let window_handle = window.clone();
-            window.on_window_event(move |event| {
+            let window_handle = window_main.clone();
+            window_main.on_window_event(move |event| {
                 if let tauri::WindowEvent::Focused(false) = event {
                     window_handle.hide().unwrap();
                 }
@@ -82,6 +101,14 @@ async fn main() {
                         window.set_focus().unwrap();
                     }
                 }
+                "setting" => {
+                    // if let Some(window) = app.get_window("main") {
+                    //     window.show().unwrap();
+                    //     window.set_focus().unwrap();
+                    //     // 触发切换到配置页面的事件
+                    //     window.emit("toggle_config_page", ()).unwrap();
+                    // }
+                }
                 _ => {}
             },
             _ => {}
@@ -90,7 +117,9 @@ async fn main() {
         .invoke_handler(tauri::generate_handler![
             rs_invoke_get_clipboards,
             rs_invoke_search_clipboards,
-            // toggle_window
+            rs_invoke_is_initialized,
+            rs_invoke_get_user_config,
+            rs_invoke_set_user_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

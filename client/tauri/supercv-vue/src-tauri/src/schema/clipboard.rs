@@ -5,10 +5,9 @@ use std::io;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
-use chrono::Datelike;
-use chrono::DateTime;
 use chrono::offset::FixedOffset;
-use cocoa::appkit::{NSPasteboardTypePNG, NSPasteboardTypeTIFF};
+use chrono::DateTime;
+use chrono::Datelike;
 use cocoa::base::nil;
 use log::debug;
 
@@ -61,6 +60,8 @@ impl PartialEq for ContentType {
 
 fn get_local_path(date_time: &DateTime<FixedOffset>, suffix: &str) -> Result<String, io::Error> {
     let root_file_path = CONFIG
+        .read()
+        .unwrap()
         .files_path
         .join(format!(
             "{}{}{}",
@@ -150,7 +151,7 @@ impl PasteboardContent {
     async fn async_save_path(pasteboard_content: Arc<Mutex<Self>>) -> Result<(), String> {
         let item = pasteboard_content.lock().unwrap().clone();
         debug!("启动 读取data的tokio,text_content: {}", item.text_content);
-        let result = time_it!(sync|| item.save_path())();
+        let result = time_it!(sync || item.save_path())();
         if let Ok(()) = result {
             Ok(())
         } else {

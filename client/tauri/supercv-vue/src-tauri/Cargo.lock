@@ -4408,6 +4408,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tokio",
+ "toml 0.8.15",
  "unicode-segmentation",
  "url",
  "urlencoding",

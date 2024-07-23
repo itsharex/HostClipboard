@@ -1,5 +1,6 @@
-use log::{debug, error};
+    use log::error;
 use sea_orm::DatabaseConnection;
+use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, Notify};
@@ -10,8 +11,9 @@ use crate::db::crud;
 use crate::db::entities::host_clipboard::Model;
 use crate::schema::clipboard::PasteboardContent;
 use crate::search_engine::indexer::ClipboardIndexer;
-use crate::utils::logger;
-use crate::{time_it, utils};
+use crate::utils;
+use crate::utils::config::{UserConfig, CONFIG};
+use crate::utils::{config, logger};
 
 pub struct ClipboardHelper {
     pasteboard: Arc<Mutex<Pasteboard>>,
@@ -46,7 +48,7 @@ impl ClipboardHelper {
         let db = init_db_connection(None).await?;
         *self.db.lock().await = Some(db.clone());
 
-        let indexer = ClipboardIndexer::new(db, Some(10)).await;
+        let indexer = ClipboardIndexer::new(db).await;
         *self.indexer.lock().await = Some(indexer);
 
         // 启动读取剪贴板的任务
@@ -101,6 +103,9 @@ impl ClipboardHelper {
             self.init_notifier.notified().await;
         }
     }
+    pub fn is_initialized(&self) -> bool {
+        self.initialized.load(Ordering::SeqCst)
+    }
 
     async fn send_content(&self) {
         let content = unsafe { self.pasteboard.lock().await.get_contents() };
@@ -119,14 +124,8 @@ impl ClipboardHelper {
         self.ensure_initialized().await;
         let db_guard = self.db.lock().await;
         let db = db_guard.as_ref().unwrap();
-        let ts = utils::time::get_current_timestamp() - 3 * 24 * 60 * 60;
-        let all_entries = crud::host_clipboard::get_num_clipboards_by_timestamp_and_type_list(
-            &db,
-            Some(num),
-            ts,
-            type_list,
-        )
-        .await?;
+        let all_entries =
+            crud::host_clipboard::get_clipboards_by_type_list(&db, Some(num), type_list).await?;
         Ok(all_entries)
     }
 
@@ -156,8 +155,12 @@ impl ClipboardHelper {
             }
         }
     }
-    async fn reload_config() {
-        todo!()
+    async fn get_user_config() -> UserConfig {
+        CONFIG.read().unwrap().user_config.clone()
+    }
+
+    async fn set_user_config(user_config: UserConfig) -> io::Result<()> {
+        config::update(user_config).await
     }
 }
 
@@ -188,6 +191,39 @@ pub async fn rs_invoke_search_clipboards(
         Err(e) => {
             error!("rs_invoke_search_clipboards err: {:?}", e);
             Err(format!("Failed to search clipboards: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn rs_invoke_is_initialized(
+    state: tauri::State<'_, Arc<ClipboardHelper>>,
+) -> Result<bool, String> {
+    match state.is_initialized() {
+        true => Ok(true),
+        false => Ok(false),
+    }
+}
+
+#[tauri::command]
+pub async fn rs_invoke_get_user_config(
+    state: tauri::State<'_, Arc<ClipboardHelper>>,
+) -> Result<UserConfig, String> {
+    match ClipboardHelper::get_user_config().await {
+        config => Ok(config),
+    }
+}
+
+#[tauri::command]
+pub async fn rs_invoke_set_user_config(
+    state: tauri::State<'_, Arc<ClipboardHelper>>,
+    user_config: UserConfig,
+) -> Result<bool, String> {
+    match ClipboardHelper::set_user_config(user_config).await {
+        Ok(()) => Ok(true),
+        Err(e) => {
+            error!("rs_invoke_set_config err: {:?}", e);
+            Err(format!("Failed to set config: {}", e))
         }
     }
 }

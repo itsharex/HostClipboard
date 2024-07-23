@@ -20,7 +20,7 @@ impl SafeObjcPtr {
         }
     }
 
-    pub(crate) fn get(&self) -> *mut Object {
+    pub(crate) fn _get(&self) -> *mut Object {
         self.ptr
     }
 }
