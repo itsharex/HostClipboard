@@ -1,6 +1,17 @@
 import { createApp } from "vue";
 import App from "./App.vue";
+import { createRouter, createWebHashHistory } from "vue-router";
+import Main from "./views/Main.vue";
+import Settings from "./views/Settings.vue";
 
-// import "./styles.css";
+const routes = [
+  { path: "/", component: Main },
+  { path: "/settings", component: Settings },
+];
 
-createApp(App).mount("#app");
+const router = createRouter({
+  history: createWebHashHistory(),
+  routes,
+});
+
+createApp(App).use(router).mount("#app");

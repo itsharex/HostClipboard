@@ -50,6 +50,15 @@
                 "title": "SuperCV",
                 "width": 800,
                 "height": 600
+            },
+            {
+                "label": "settings",
+                "fullscreen": false,
+                "resizable": true,
+                "title": "Settings",
+                "width": 1000,
+                "height": 800,
+                "url": "index.html#/settings"
             }
         ],
         "macOSPrivateApi": true
