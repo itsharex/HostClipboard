@@ -11,8 +11,8 @@ const clipboardEntries = ref<ClipboardEntry[]>([]);
 const selectedIndex = ref(-1);
 let isKeyboardSelection = ref(true);
 
-async function openSettings() {
-    await invoke("open_settings");
+function openSettings() {
+    invoke("open_settings");
 }
 
 
@@ -72,6 +72,13 @@ function handleKeydown(e: KeyboardEvent) {
         }
     } else if (e.key === "Escape") {
         appWindow.hide();
+    } else if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault() // 阻止默认行为
+        try {
+            openSettings()
+        } catch (e) {
+            console.error('Failed to open settings:', e)
+        }
     }
 }
 
@@ -85,6 +92,7 @@ onMounted(async () => {
     await getClipboardContent();
     document.addEventListener("keydown", handleKeydown);
     document.addEventListener("mousemove", handleMouseMove);
+
 
     await appWindow.onFocusChanged(({ payload: focused }) => {
         if (focused) {
@@ -150,10 +158,10 @@ const formattedTimestamp = computed(() => {
                             selectedIndex = index;
                             copyToClipboardAndHide(item.content);
                         }" @mouseover="() => {
-    if (!isKeyboardSelection) {
-        selectedIndex = index;
-    }
-}">
+                            if (!isKeyboardSelection) {
+                                selectedIndex = index;
+                            }
+                        }">
                         {{ item.content }}
                     </li>
                 </ul>
@@ -164,12 +172,13 @@ const formattedTimestamp = computed(() => {
                 </div>
                 <div class="timestamp-wrapper">
                     <div class="timestamp" v-if="selectedTimestamp">{{ formattedTimestamp }}</div>
-                    <button @click="openSettings" class="settings-button">设置</button>
+                    <button @click="openSettings" class="settings-button">⚙️</button>
                 </div>
             </div>
         </div>
     </div>
 </template>
+
 
 <style>
 body,
@@ -177,13 +186,19 @@ html {
     margin: 0;
     padding: 0;
     height: 100%;
-    font-family: Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow: hidden;
+    /* 防止内容超出圆角区域 */
 }
 
 #app {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: #ffffff;
+    /* 或者您想要的背景色 */
 }
 
 #input-container {
@@ -198,7 +213,8 @@ html {
     padding: 10px;
     font-size: 16px;
     border: 1px solid #ccc;
-    border-radius: 4px;
+    border-radius: 12px;
+    /* 圆角效果 */
 }
 
 #content-container {
@@ -226,11 +242,15 @@ html {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    border-radius: 8px;
+    /* 圆角效果 */
 }
 
 #selectable-list li.selected {
     background-color: #4caf50;
     color: white;
+    border-radius: 8px;
+    /* 圆角效果 */
 }
 
 #display-container {
@@ -247,6 +267,8 @@ html {
     padding: 10px;
     padding-bottom: 40px;
     /* 为时间戳留出空间 */
+    border-radius: 12px;
+    /* 圆角效果 */
 }
 
 .content-wrapper pre {
@@ -263,20 +285,23 @@ html {
     width: 100%;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
+    /* Center the timestamp */
     background-color: #f0f0f0;
     border-top: 1px solid #ccc;
     position: absolute;
     bottom: 0;
     left: 0;
     padding: 0 10px;
+    box-sizing: border-box;
 }
 
 .timestamp {
     font-size: 15px;
     color: #666;
     padding: 2px 5px;
-    border-radius: 3px;
+    border-radius: 8px;
+    /* 圆角效果 */
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -285,15 +310,25 @@ html {
 
 .settings-button {
     padding: 5px 10px;
-    background-color: #4CAF50;
-    color: white;
+    background-color: transparent;
+    color: #4CAF50;
     border: none;
-    border-radius: 3px;
+    border-radius: 8px;
+    /* 圆角效果 */
     cursor: pointer;
-    font-size: 12px;
+    font-size: 18px;
+    position: absolute;
+    right: 0.3%;
+    /* 固定距离右边缘 */
+    bottom: 50%;
+    /* 在包装中垂直居中 */
+    transform: translateY(50%);
+    /* 调整垂直定心 */
 }
 
 .settings-button:hover {
-    background-color: #45a049;
+    background-color: rgba(28, 57, 29, 0.1);
+    border-radius: 12px;
+    /* 圆角效果 */
 }
 </style>

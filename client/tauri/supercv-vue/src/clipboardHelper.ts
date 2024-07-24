@@ -9,6 +9,19 @@ export interface ClipboardEntry {
   uuid: string;
 }
 
+export interface ExpiredConfig {
+  text: number;
+  img: number;
+  file: number;
+}
+export interface PreviewConfig {
+  preview_number: number;
+}
+
+export interface UserConfig {
+  expired_config: ExpiredConfig;
+  preview_config: PreviewConfig;
+}
 export class ClipboardHelper {
   static async getClipboardEntries(
     num: number = 10,
@@ -49,6 +62,29 @@ export class ClipboardHelper {
       console.error("Failed to search clipboard entries:", error);
       // throw error;
       return [];
+    }
+  }
+}
+
+export class UserConfig {
+  static async getUserConfig(): Promise<UserConfig> {
+    try {
+      const result = await invoke<UserConfig>("rs_invoke_get_user_config");
+      return result;
+    } catch (error) {
+      console.error("Failed to get user config:", error);
+      throw error;
+    }
+  }
+
+  static async setUserConfig(userConfig: UserConfig): Promise<void> {
+    try {
+      await invoke<void>("rs_invoke_set_user_config", {
+        userConfig,
+      });
+    } catch (error) {
+      console.error("Failed to set user config:", error);
+      throw error;
     }
   }
 }

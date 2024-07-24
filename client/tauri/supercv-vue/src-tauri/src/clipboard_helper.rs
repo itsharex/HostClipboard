@@ -1,4 +1,4 @@
-    use log::error;
+use log::error;
 use sea_orm::DatabaseConnection;
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};

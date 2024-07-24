@@ -22,14 +22,20 @@ mod search_engine;
 mod utils;
 
 #[tauri::command]
-fn open_settings(window: tauri::Window) {
+fn open_settings(window: tauri::Window) -> Result<(), String> {
     if let Some(settings_window) = window.get_window("settings") {
-        settings_window.show().unwrap();
+        settings_window.show().map_err(|e| e.to_string())?;
+        settings_window.set_focus().map_err(|e| e.to_string())?;
+    } else {
+        return Err("Settings window not found".into());
     }
+    Ok(())
 }
 
-
-async fn toggle_windows(main_window: &tauri::Window, settings_window: &tauri::Window) -> Result<(), tauri::Error> {
+async fn toggle_windows(
+    main_window: &tauri::Window,
+    settings_window: &tauri::Window,
+) -> Result<(), tauri::Error> {
     let main_visible = main_window.is_visible()?;
     let settings_visible = settings_window.is_visible()?;
 
@@ -64,6 +70,7 @@ async fn main() {
 
     tauri::Builder::default()
         .setup(move |app| {
+            let app_handle = app.handle();
             let clipboard_helper = clipboard_helper_for_setup.clone();
             tauri::async_runtime::spawn(async move {
                 let result = time_it!(async  clipboard_helper.init(None, Some(2)).await ).await;
@@ -78,7 +85,6 @@ async fn main() {
             window_main.set_decorations(false).unwrap();
             let window_settings = app.get_window("settings").unwrap();
             window_settings.hide()?;
-
 
             // 注册全局快捷键
             let mut global_shortcut = app.global_shortcut_manager();
@@ -96,21 +102,6 @@ async fn main() {
                     });
                 })
                 .unwrap();
-
-            let w_main_handle = window_main.clone();
-            let w_set_handle = window_settings.clone();
-            global_shortcut
-                .register("CommandOrControl+,", move || {
-                    let w_main = w_main_handle.clone();
-                    let w_set = w_set_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        if let Err(e) = toggle_windows(&w_main, &w_set).await {
-                            error!("Error toggling windows: {}", e);
-                        }
-                    });
-                })
-                .unwrap_or_else(|e| error!("Failed to register shortcut: {}", e));
-
 
             // 添加失去焦点事件处理
             let window_handle = window_main.clone();

@@ -3,13 +3,16 @@ use rayon::prelude::*;
 use std::collections::Bound::{Excluded, Unbounded};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, Mutex};
-#[derive(Debug)]
+use deepsize::DeepSizeOf;
+use log::debug;
+
+#[derive(Debug, DeepSizeOf)]
 pub struct Trie {
     pub timestamp_ids: Arc<Mutex<BTreeMap<i64, HashSet<i32>>>>,
     pub root: Arc<Mutex<TrieNode>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, DeepSizeOf)]
 struct TrieNode {
     children: HashMap<char, Arc<Mutex<TrieNode>>>,
     doc_ids: Vec<(i32, i32, i64)>, // (doc_id, doc_type, timestamp)
@@ -61,6 +64,13 @@ impl Trie {
                 }
             }
         });
+        {
+            let current = self.root.clone();
+            let timestamp_ids = self.timestamp_ids.lock().unwrap();
+            debug!("timestamp_ids size: {:?}", timestamp_ids.deep_size_of());   
+            debug!("current size: {:?}", current.deep_size_of());   
+            debug!("Trie: {:?}", &self.deep_size_of());   
+        }
     }
 
     pub fn search(&self, query: &str, n: u64, type_list: Option<Vec<i32>>) -> Vec<i32> {

@@ -8,6 +8,7 @@ use sea_orm::{DatabaseConnection, DbErr};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
+use deepsize::DeepSizeOf;
 
 pub struct ClipboardIndexer {
     trie: Arc<RwLock<Trie>>,
@@ -19,6 +20,11 @@ impl ClipboardIndexer {
     pub async fn new(db: DatabaseConnection) -> Self {
         debug!("start");
         let trie = Arc::new(RwLock::new(Trie::new()));
+        // {
+        //     let trie_s = trie.clone().read().await;
+        //     debug!("trie size: {:?}", &trie_s.deep_size_of());     
+        // }
+
         let last_update = Arc::new(RwLock::new(time::get_current_timestamp()));
 
         let indexer = ClipboardIndexer {
@@ -59,7 +65,10 @@ impl ClipboardIndexer {
             &query, &num, &type_list
         );
         let trie = self.trie.read().await;
-        let results_id = time_it!(sync || trie.search(query, num, type_list))();
+        let results_id = time_it!(sync || {
+            debug!("trie size: {:?}", &trie.deep_size_of());   
+            trie.search(query, num, type_list)
+        })();
 
         debug!("results_id: {:?}", results_id);
         crud::host_clipboard::get_clipboard_entries_by_id_list(&self.db, Some(results_id))
