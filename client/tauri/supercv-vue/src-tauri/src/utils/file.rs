@@ -1,4 +1,5 @@
 use std::fs;
+use log::error;
 
 pub fn format_size(size: usize) -> String {
     const KB: usize = 1024;
@@ -17,6 +18,12 @@ pub fn format_size(size: usize) -> String {
 }
 
 pub fn get_file_size(file_path: &String) -> String {
-    let metadata = fs::metadata(file_path).unwrap();
-    format_size(metadata.len() as usize)
+    let size = match fs::metadata(file_path) {
+        Ok(metadata) => metadata.len(),
+        Err(e) => {
+            error!("Failed to get file size: {}", e);
+            0
+        }
+    };
+    format_size(size as usize)
 }

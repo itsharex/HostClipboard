@@ -3,7 +3,7 @@
     windows_subsystem = "windows"
 )]
 
-use log::{debug, error, info};
+use log::{debug, info};
 use std::sync::Arc;
 use tauri::GlobalShortcutManager;
 use tauri::Manager;
@@ -13,12 +13,12 @@ use crate::clipboard_helper::{
     rs_invoke_get_clipboards, rs_invoke_get_user_config, rs_invoke_is_initialized,
     rs_invoke_search_clipboards, rs_invoke_set_user_config, ClipboardHelper,
 };
+use crate::utils::config::CONFIG;
 
-mod apis;
+mod core;
 mod clipboard_helper;
 mod db;
 mod schema;
-mod search_engine;
 mod utils;
 
 #[tauri::command]
@@ -32,26 +32,7 @@ fn open_settings(window: tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
-async fn toggle_windows(
-    main_window: &tauri::Window,
-    settings_window: &tauri::Window,
-) -> Result<(), tauri::Error> {
-    let main_visible = main_window.is_visible()?;
-    let settings_visible = settings_window.is_visible()?;
 
-    if !settings_visible {
-        info!("Showing settings window");
-        settings_window.show()?;
-        settings_window.set_focus()?;
-        if main_visible {
-            main_window.hide()?;
-        }
-    } else {
-        info!("Hiding settings window");
-        settings_window.hide()?;
-    }
-    Ok(())
-}
 
 #[tokio::main]
 async fn main() {
@@ -71,6 +52,7 @@ async fn main() {
     tauri::Builder::default()
         .setup(move |app| {
             let app_handle = app.handle();
+            app_handle.asset_protocol_scope().allow_directory(CONFIG.read().unwrap().files_path.as_path(), true)?;
             let clipboard_helper = clipboard_helper_for_setup.clone();
             tauri::async_runtime::spawn(async move {
                 let result = time_it!(async  clipboard_helper.init(None, Some(2)).await ).await;

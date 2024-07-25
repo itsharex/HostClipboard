@@ -1,5 +1,5 @@
 use crate::db::entities::host_clipboard::{self, Entity as ClipboardEntries};
-use crate::schema::clipboard::PasteboardContent;
+use crate::core::pasteboard::PasteboardContent;
 use crate::utils::config::CONFIG;
 use sea_orm::sea_query::Expr;
 use sea_orm::ActiveValue::Set;
@@ -10,11 +10,11 @@ pub async fn add_clipboard_entry(
     item: PasteboardContent,
 ) -> Result<host_clipboard::Model, DbErr> {
     let new_entry = host_clipboard::ActiveModel {
-        r#type: Set(item.content_type.to_i32()),
+        r#type: Set(item.r#type.to_i32()),
         path: Set(item.path),
         content: Set(item.text_content),
         timestamp: Set(item.date_time.timestamp()),
-        uuid: Set(item.uuid.clone()),
+        hash: Set(item.hash),
         ..Default::default()
     };
 
@@ -63,6 +63,7 @@ pub async fn add_clipboard_entry(
 // }
 pub async fn get_clipboards_by_type_list(
     db: &DatabaseConnection,
+    text: Option<&str>,
     num: Option<u64>,
     type_list: Option<Vec<i32>>,
 ) -> Result<Vec<host_clipboard::Model>, DbErr> {
@@ -94,6 +95,16 @@ pub async fn get_clipboards_by_type_list(
             ),
     );
 
+    if let Some(text) = text {
+        query = query.filter(
+            Expr::cust("LOWER(content)").like(format!("%{}%", text)), // 直接使用原始文本进行模糊匹配
+        );
+    }
+
+    if let Some(num) = num {
+        query = query.limit(num);
+    }
+
     // 如果提供了type_list，则添加类型过滤
     if let Some(type_list) = type_list {
         query = query.filter(host_clipboard::Column::Type.is_in(type_list));
@@ -101,10 +112,6 @@ pub async fn get_clipboards_by_type_list(
 
     // 按时间戳降序排序并限制结果数量
     query = query.order_by_desc(host_clipboard::Column::Timestamp);
-
-    if let Some(num) = num {
-        query = query.limit(num);
-    }
 
     query.all(db).await
 }

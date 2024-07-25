@@ -1,5 +1,5 @@
 pub mod time;
-pub mod uuid;
+pub mod hash;
 pub mod file;
 pub mod config;
 pub mod logger;

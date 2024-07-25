@@ -12,7 +12,7 @@ pub struct Model {
     pub path: String,
     pub content: String,
     pub timestamp: i64,
-    pub uuid: String,
+    pub hash: u64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

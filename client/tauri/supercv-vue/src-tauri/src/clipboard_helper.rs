@@ -5,22 +5,21 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, Notify};
 
-use crate::apis::pasteboard::Pasteboard;
+use crate::core::pasteboard::Pasteboard;
 use crate::db::connection::init_db_connection;
 use crate::db::crud;
 use crate::db::entities::host_clipboard::Model;
-use crate::schema::clipboard::PasteboardContent;
-use crate::search_engine::indexer::ClipboardIndexer;
-use crate::utils;
+use crate::core::pasteboard::PasteboardContent;
 use crate::utils::config::{UserConfig, CONFIG};
 use crate::utils::{config, logger};
+use crate::{time_it};
+use log::debug;
 
 pub struct ClipboardHelper {
     pasteboard: Arc<Mutex<Pasteboard>>,
     db: Arc<Mutex<Option<DatabaseConnection>>>,
     sender: mpsc::Sender<PasteboardContent>,
     receiver: Arc<Mutex<mpsc::Receiver<PasteboardContent>>>,
-    indexer: Arc<Mutex<Option<ClipboardIndexer>>>,
     initialized: Arc<AtomicBool>,
     init_notifier: Arc<Notify>,
 }
@@ -33,7 +32,6 @@ impl ClipboardHelper {
             db: Arc::new(Mutex::new(None)),
             sender,
             receiver: Arc::new(Mutex::new(receiver)),
-            indexer: Arc::new(Mutex::new(None)),
             initialized: Arc::new(AtomicBool::new(false)),
             init_notifier: Arc::new(Notify::new()),
         }
@@ -47,9 +45,6 @@ impl ClipboardHelper {
         logger::init_logger(log_level, sql_level);
         let db = init_db_connection(None).await?;
         *self.db.lock().await = Some(db.clone());
-
-        let indexer = ClipboardIndexer::new(db).await;
-        *self.indexer.lock().await = Some(indexer);
 
         // 启动读取剪贴板的任务
         let pasteboard_clone = self.pasteboard.clone();
@@ -85,12 +80,6 @@ impl ClipboardHelper {
             }
         });
 
-        let indexer_clone = self.indexer.clone();
-        tokio::spawn(async move {
-            if let Some(indexer) = indexer_clone.lock().await.as_ref() {
-                indexer.start_background_update().await;
-            }
-        });
 
         self.initialized.store(true, Ordering::SeqCst);
         self.init_notifier.notify_waiters();
@@ -124,8 +113,11 @@ impl ClipboardHelper {
         self.ensure_initialized().await;
         let db_guard = self.db.lock().await;
         let db = db_guard.as_ref().unwrap();
-        let all_entries =
-            crud::host_clipboard::get_clipboards_by_type_list(&db, Some(num), type_list).await?;
+        let all_entries = time_it!(async {
+            crud::host_clipboard::get_clipboards_by_type_list(&db, None, Some(num), type_list)
+        })
+        .await
+        .await?;
         Ok(all_entries)
     }
 
@@ -136,24 +128,19 @@ impl ClipboardHelper {
         type_list: Option<Vec<i32>>,
     ) -> Result<Vec<Model>, Box<dyn std::error::Error>> {
         self.ensure_initialized().await;
-        // 首先获取锁
-        let indexer_guard = self.indexer.lock().await;
-
-        // 检查indexer是否已初始化
-        match indexer_guard.as_ref() {
-            Some(indexer) => {
-                // 如果indexer已初始化，执行搜索
-                let results = indexer.search(query, num, type_list).await;
-                Ok(results)
-            }
-            None => {
-                // 如果indexer未初始化，返回错误
-                Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Indexer not initialized",
-                )))
-            }
-        }
+        let db_guard = self.db.lock().await;
+        let db = db_guard.as_ref().unwrap();
+        let all_entries = time_it!(async {
+            crud::host_clipboard::get_clipboards_by_type_list(
+                &db,
+                Some(query),
+                Some(num),
+                type_list,
+            )
+        })
+        .await
+        .await?;
+        Ok(all_entries)
     }
     async fn get_user_config() -> UserConfig {
         CONFIG.read().unwrap().user_config.clone()
@@ -207,7 +194,7 @@ pub async fn rs_invoke_is_initialized(
 
 #[tauri::command]
 pub async fn rs_invoke_get_user_config(
-    state: tauri::State<'_, Arc<ClipboardHelper>>,
+    _: tauri::State<'_, Arc<ClipboardHelper>>,
 ) -> Result<UserConfig, String> {
     match ClipboardHelper::get_user_config().await {
         config => Ok(config),
@@ -216,7 +203,7 @@ pub async fn rs_invoke_get_user_config(
 
 #[tauri::command]
 pub async fn rs_invoke_set_user_config(
-    state: tauri::State<'_, Arc<ClipboardHelper>>,
+    _: tauri::State<'_, Arc<ClipboardHelper>>,
     user_config: UserConfig,
 ) -> Result<bool, String> {
     match ClipboardHelper::set_user_config(user_config).await {

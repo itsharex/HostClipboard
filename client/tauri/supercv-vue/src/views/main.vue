@@ -3,8 +3,7 @@ import { ref, onMounted, computed, watch } from "vue";
 import { appWindow } from "@tauri-apps/api/window";
 import { ClipboardHelper, ClipboardEntry } from "../clipboardHelper";
 import { invoke } from "@tauri-apps/api/tauri";
-
-
+import { convertFileSrc } from '@tauri-apps/api/tauri';
 
 const textInput = ref("");
 const clipboardEntries = ref<ClipboardEntry[]>([]);
@@ -23,6 +22,26 @@ const displayContent = computed(() => {
     return "";
 });
 
+const selectedEntry = computed(() => {
+    if (selectedIndex.value >= 0 && selectedIndex.value < clipboardEntries.value.length) {
+        return clipboardEntries.value[selectedIndex.value];
+    }
+    return null;
+});
+
+const isImageEntry = computed(() => {
+    console.log("imageSrc", selectedEntry.value)
+    return selectedEntry.value?.type === 1;
+});
+
+const imageSrc = computed(() => {
+    if (isImageEntry.value && selectedEntry.value) {
+        console.log("imageSrc", selectedEntry.value.path)
+        return convertFileSrc(selectedEntry.value.path);
+    }
+    return '';
+});
+
 async function getClipboardContent() {
     try {
         clipboardEntries.value = await ClipboardHelper.getClipboardEntries();
@@ -35,7 +54,9 @@ async function getClipboardContent() {
 
 async function searchClipboard() {
     try {
-        clipboardEntries.value = await ClipboardHelper.searchClipboardEntries(textInput.value);
+        clipboardEntries.value = await ClipboardHelper.searchClipboardEntries(
+            textInput.value
+        );
         selectedIndex.value = -1; // Reset selection
     } catch (error) {
         console.error("Failed to search clipboard content:", error);
@@ -72,12 +93,12 @@ function handleKeydown(e: KeyboardEvent) {
         }
     } else if (e.key === "Escape") {
         appWindow.hide();
-    } else if ((e.metaKey || e.ctrlKey) && e.key === ',') {
-        e.preventDefault() // 阻止默认行为
+    } else if ((e.metaKey || e.ctrlKey) && e.key === ",") {
+        e.preventDefault(); // 阻止默认行为
         try {
-            openSettings()
+            openSettings();
         } catch (e) {
-            console.error('Failed to open settings:', e)
+            console.error("Failed to open settings:", e);
         }
     }
 }
@@ -92,7 +113,6 @@ onMounted(async () => {
     await getClipboardContent();
     document.addEventListener("keydown", handleKeydown);
     document.addEventListener("mousemove", handleMouseMove);
-
 
     await appWindow.onFocusChanged(({ payload: focused }) => {
         if (focused) {
@@ -113,9 +133,11 @@ watch(textInput, () => {
     }
 });
 
-
 const selectedTimestamp = computed(() => {
-    if (selectedIndex.value >= 0 && selectedIndex.value < clipboardEntries.value.length) {
+    if (
+        selectedIndex.value >= 0 &&
+        selectedIndex.value < clipboardEntries.value.length
+    ) {
         return clipboardEntries.value[selectedIndex.value].timestamp;
     }
     return null;
@@ -129,20 +151,19 @@ const formattedTimestamp = computed(() => {
 
         // 使用更易读的格式
         const options: Intl.DateTimeFormatOptions = {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
         };
 
         return date.toLocaleString(undefined, options);
     }
     return "";
 });
-
 </script>
 
 <template>
@@ -157,21 +178,26 @@ const formattedTimestamp = computed(() => {
                         :class="{ selected: index === selectedIndex }" @click="() => {
                             selectedIndex = index;
                             copyToClipboardAndHide(item.content);
-                        }" @mouseover="() => {
-                            if (!isKeyboardSelection) {
-                                selectedIndex = index;
+                        }
+                            " @mouseover="() => {
+                                if (!isKeyboardSelection) {
+                                    selectedIndex = index;
+                                }
                             }
-                        }">
+                                ">
                         {{ item.content }}
                     </li>
                 </ul>
             </div>
             <div id="display-container">
                 <div class="content-wrapper">
-                    <pre>{{ displayContent }}</pre>
+                    <img v-if="isImageEntry" :src="imageSrc" alt="Clipboard image" />
+                    <pre v-else>{{ displayContent }}</pre>
                 </div>
                 <div class="timestamp-wrapper">
-                    <div class="timestamp" v-if="selectedTimestamp">{{ formattedTimestamp }}</div>
+                    <div class="timestamp" v-if="selectedTimestamp">
+                        {{ formattedTimestamp }}
+                    </div>
                     <button @click="openSettings" class="settings-button">⚙️</button>
                 </div>
             </div>
@@ -179,14 +205,14 @@ const formattedTimestamp = computed(() => {
     </div>
 </template>
 
-
 <style>
 body,
 html {
     margin: 0;
     padding: 0;
     height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
     overflow: hidden;
     /* 防止内容超出圆角区域 */
 }
@@ -311,7 +337,7 @@ html {
 .settings-button {
     padding: 5px 10px;
     background-color: transparent;
-    color: #4CAF50;
+    color: #4caf50;
     border: none;
     border-radius: 8px;
     /* 圆角效果 */
@@ -330,5 +356,18 @@ html {
     background-color: rgba(28, 57, 29, 0.1);
     border-radius: 12px;
     /* 圆角效果 */
+}
+
+
+.content-wrapper img {
+    display: block;
+    /* 设置 img 为块级元素 */
+    margin: auto;
+    /* 自动外边距实现水平居中 */
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    /* 垂直居中（如果父元素是 flex 或 grid 容器） */
+    align-self: center;
 }
 </style>

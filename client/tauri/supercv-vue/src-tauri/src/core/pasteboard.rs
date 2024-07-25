@@ -8,10 +8,8 @@ use std::sync::{Arc, Mutex};
 use chrono::offset::FixedOffset;
 use chrono::DateTime;
 use chrono::Datelike;
-use cocoa::base::nil;
 use log::debug;
 
-use crate::apis::safe_objc_ptr::SafeObjcPtr;
 use crate::time_it;
 use crate::utils;
 use crate::utils::config::CONFIG;
@@ -43,12 +41,11 @@ impl ToString for ContentType {
 }
 
 pub struct PasteboardContent {
-    pub text_content: String,          // 索引内容
-    pub content_type: ContentType,     // 类型
-    pub content: Option<Vec<u8>>,      // 二进制内容
-    pub path: String,                  // 路径
-    pub item: Arc<Mutex<SafeObjcPtr>>, // 对应的item对象
-    pub uuid: String,
+    pub text_content: String,     // 索引内容
+    pub r#type: ContentType,      // 类型
+    pub content: Option<Vec<u8>>, // 二进制内容
+    pub path: String,             // 路径
+    pub hash: u64,// content or text_content hash
     pub date_time: DateTime<FixedOffset>,
 }
 
@@ -88,10 +85,11 @@ fn get_local_path(date_time: &DateTime<FixedOffset>, suffix: &str) -> Result<Str
 impl PasteboardContent {
     // 创建文本类型的 PasteboardContent
     pub fn new(
-        text_content: String,
+        content: String,
         content_type: ContentType,
-        content: Option<Vec<u8>>,
-        item: *mut objc::runtime::Object,
+        hash: u64,
+        byte: Option<Vec<u8>>,
+        path: Option<String>,
     ) -> Arc<Mutex<Self>> {
         let date_time = utils::time::get_current_date_time();
 
@@ -126,15 +124,13 @@ impl PasteboardContent {
             }
         };
 
-        let safe_item = SafeObjcPtr::new(item);
 
         let pasteboard_content = Arc::new(Mutex::new(PasteboardContent {
             text_content: text_content_show,
-            content_type,
+            r#type: content_type,
             content,
             path,
-            item: Arc::new(Mutex::new(safe_item)),
-            uuid: utils::uuid::get_uuid(),
+            hash,
             date_time,
         }));
 
@@ -184,11 +180,11 @@ impl PasteboardContent {
             let text = std::iter::repeat(format!("{} hi", i)).take(40).collect();
             result.push(PasteboardContent {
                 text_content: text,
-                content_type: ContentType::Text,
+                r#type: ContentType::Text,
                 content: None,
                 path: "".to_string(),
                 item: Arc::clone(&empty_item),
-                uuid: utils::uuid::get_uuid(),
+                hash: utils::hash::get_uuid(),
                 date_time: utils::time::get_current_date_time(),
             });
         }
@@ -200,11 +196,11 @@ impl Clone for PasteboardContent {
     fn clone(&self) -> Self {
         PasteboardContent {
             text_content: self.text_content.clone(),
-            content_type: self.content_type.clone(),
+            r#type: self.r#type.clone(),
             content: self.content.clone(),
             path: self.path.clone(),
             item: Arc::clone(&self.item),
-            uuid: self.uuid.clone(),
+            hash: self.hash.clone(),
             date_time: self.date_time.clone(),
         }
     }
@@ -218,7 +214,7 @@ impl fmt::Debug for PasteboardContent {
         };
 
         f.debug_struct("PasteboardContent")
-            .field("content_type", &self.content_type)
+            .field("type", &self.r#type)
             .field("content", &content_length)
             .field("text_content", &self.text_content)
             .finish()

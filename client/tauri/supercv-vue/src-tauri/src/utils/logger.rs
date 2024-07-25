@@ -34,7 +34,6 @@ pub fn convert_log(log_int: Option<i32>) -> String {
         _ => "debug".to_string(),
     }
 }
-
 #[macro_export]
 macro_rules! time_it {
     // 同步版本
@@ -71,7 +70,6 @@ macro_rules! time_it {
         } else {
             (nanos as f64, "ns")
         };
-
         debug!(
             "file={}:{} elapsed={:.3} {}",
             file!(), line!(), value, unit
