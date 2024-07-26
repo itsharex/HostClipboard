@@ -6,8 +6,8 @@
         "distDir": "../dist"
     },
     "package": {
-        "productName": "Clipboard Helper",
-        "version": "0.0.0"
+        "productName": "SuperCV",
+        "version": "0.0.1"
     },
     "tauri": {
         "allowlist": {
