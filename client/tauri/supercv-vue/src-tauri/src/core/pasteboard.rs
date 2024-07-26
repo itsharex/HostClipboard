@@ -1,18 +1,10 @@
 extern crate chrono;
 use std::cmp::PartialEq;
-use std::fmt;
-use std::io;
-use std::io::Write;
-use std::sync::{Arc, Mutex};
 
 use chrono::offset::FixedOffset;
 use chrono::DateTime;
-use chrono::Datelike;
-use log::debug;
 
-use crate::time_it;
-use crate::utils;
-use crate::utils::config::CONFIG;
+use crate::utils::time::get_current_date_time;
 
 #[derive(Debug, Clone)]
 pub enum ContentType {
@@ -30,24 +22,6 @@ impl ContentType {
         }
     }
 }
-impl ToString for ContentType {
-    fn to_string(&self) -> String {
-        match self {
-            ContentType::Text => "Text".to_string(),
-            ContentType::File => "File".to_string(),
-            ContentType::Image => "Image".to_string(),
-        }
-    }
-}
-
-pub struct PasteboardContent {
-    pub text_content: String,     // 索引内容
-    pub r#type: ContentType,      // 类型
-    pub content: Option<Vec<u8>>, // 二进制内容
-    pub path: String,             // 路径
-    pub hash: u64,// content or text_content hash
-    pub date_time: DateTime<FixedOffset>,
-}
 
 impl PartialEq for ContentType {
     fn eq(&self, other: &Self) -> bool {
@@ -55,168 +29,29 @@ impl PartialEq for ContentType {
     }
 }
 
-fn get_local_path(date_time: &DateTime<FixedOffset>, suffix: &str) -> Result<String, io::Error> {
-    let root_file_path = CONFIG
-        .read()
-        .unwrap()
-        .files_path
-        .join(format!(
-            "{}{}{}",
-            date_time.year(),
-            date_time.month(),
-            date_time.day()
-        ))
-        .to_str()
-        .unwrap()
-        .to_string();
-    // 判断root_file_path 是否存在 不存在则递归创建
-    if !std::path::Path::new(&root_file_path).exists() {
-        std::fs::create_dir_all(&root_file_path).unwrap_or_else(|e| {
-            panic!("Failed to create directories: {}", e);
-        });
-    }
-    Ok(format!(
-        "{}/{}.{}",
-        root_file_path,
-        date_time.timestamp(),
-        suffix
-    ))
+#[derive(Debug)]
+pub struct PasteboardContent {
+    pub text_content: String, // 索引内容
+    pub r#type: ContentType,  // 类型
+    pub hash: String,            // content or text_content hash
+    pub path: String,         // 路径
+    pub date_time: DateTime<FixedOffset>,
 }
+
 impl PasteboardContent {
     // 创建文本类型的 PasteboardContent
     pub fn new(
-        content: String,
+        text_content: String,
         content_type: ContentType,
-        hash: u64,
-        byte: Option<Vec<u8>>,
+        hash: String,
         path: Option<String>,
-    ) -> Arc<Mutex<Self>> {
-        let date_time = utils::time::get_current_date_time();
-
-        // 定义text_content
-        let (text_content_show, path): (String, String);
-
-        match content_type {
-            ContentType::Text => {
-                path = match &content {
-                    Some(_data) => {
-                        let suffix = "txt";
-                        get_local_path(&date_time, suffix).unwrap()
-                    }
-                    _ => "".to_string(),
-                };
-                text_content_show = text_content
-            }
-            ContentType::Image => {
-                let suffix = text_content;
-                let size = match &content {
-                    Some(data) => utils::file::format_size(data.len()),
-                    _ => "".to_string(),
-                };
-
-                path = get_local_path(&date_time, &suffix).unwrap();
-                text_content_show = format!("{}: ({})", content_type.to_string(), size)
-            }
-            ContentType::File => {
-                let size = utils::file::get_file_size(&text_content);
-                path = text_content;
-                text_content_show = format!("{}: {} ({})", content_type.to_string(), path, size)
-            }
-        };
-
-
-        let pasteboard_content = Arc::new(Mutex::new(PasteboardContent {
-            text_content: text_content_show,
-            r#type: content_type,
-            content,
-            path,
-            hash,
-            date_time,
-        }));
-
-        let pasteboard_content_clone = Arc::clone(&pasteboard_content);
-        // 启动异步任务来执行save_path
-        tokio::spawn(async move {
-            if let Err(e) = Self::async_save_path(pasteboard_content_clone).await {
-                eprintln!("Error saving path: {}", e);
-            }
-        });
-        pasteboard_content
-    }
-
-    async fn async_save_path(pasteboard_content: Arc<Mutex<Self>>) -> Result<(), String> {
-        let item = pasteboard_content.lock().unwrap().clone();
-        debug!("启动 读取data的tokio,text_content: {}", item.text_content);
-        let result = time_it!(sync || item.save_path())();
-        if let Ok(()) = result {
-            Ok(())
-        } else {
-            Err("Failed to save path".to_string())
-        }
-    }
-
-    pub fn save_path(self) -> Result<(), io::Error> {
-        // TODO: 存入路径
-        if self.path.is_empty() {
-            return Ok(());
-        }
-        match self.content {
-            Some(data) => {
-                let mut file = std::fs::File::create(self.path).unwrap();
-                file.write_all(&data).unwrap();
-            }
-            _ => {}
-        }
-
-        Ok(())
-    }
-
-    pub fn _fake_new(num: usize) -> Vec<Self> {
-        let mut result: Vec<PasteboardContent> = vec![];
-        let empty_ptr = SafeObjcPtr::new(nil);
-        let empty_item = Arc::new(Mutex::new(empty_ptr));
-
-        for i in 0..num {
-            let text = std::iter::repeat(format!("{} hi", i)).take(40).collect();
-            result.push(PasteboardContent {
-                text_content: text,
-                r#type: ContentType::Text,
-                content: None,
-                path: "".to_string(),
-                item: Arc::clone(&empty_item),
-                hash: utils::hash::get_uuid(),
-                date_time: utils::time::get_current_date_time(),
-            });
-        }
-        result
-    }
-}
-
-impl Clone for PasteboardContent {
-    fn clone(&self) -> Self {
+    ) -> Self {
         PasteboardContent {
-            text_content: self.text_content.clone(),
-            r#type: self.r#type.clone(),
-            content: self.content.clone(),
-            path: self.path.clone(),
-            item: Arc::clone(&self.item),
-            hash: self.hash.clone(),
-            date_time: self.date_time.clone(),
+            text_content,
+            r#type: content_type,
+            hash,
+            path: path.unwrap_or_default(),
+            date_time: get_current_date_time(),
         }
-    }
-}
-
-impl fmt::Debug for PasteboardContent {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let content_length = match &self.content {
-            Some(bytes) => format!("{}", bytes.len()),
-            None => "None".to_string(),
-        };
-
-        f.debug_struct("PasteboardContent")
-            .field("type", &self.r#type)
-            .field("content", &content_length)
-            .field("text_content", &self.text_content)
-            .finish()
     }
 }

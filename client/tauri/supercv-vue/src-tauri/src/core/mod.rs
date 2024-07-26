@@ -1,2 +1,2 @@
 pub mod pasteboard;
-mod clipboard;
+pub mod clipboard;

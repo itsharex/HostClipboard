@@ -1,14 +1,9 @@
-use ahash::AHasher;
-use std::hash::{Hash, Hasher};
+use twox_hash::xxh3::hash64;
 
-pub fn hash_str(input: &str) -> u64 {
-    let mut hasher = AHasher::new();
-    input.hash(&mut hasher);
-    hasher.finish()
+pub fn hash_str(input: &str) -> String {
+    format!("{:x}", hash64(input.as_bytes()))
 }
 
-pub fn hash_vec(input: &[u8]) -> u64 {
-    let mut hasher = AHasher::new();
-    input.hash(&mut hasher);
-    hasher.finish()
+pub fn hash_vec(input: &[u8]) -> String {
+    format!("{:x}", hash64(input))
 }

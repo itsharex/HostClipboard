@@ -10,15 +10,14 @@ use tauri::Manager;
 use tauri::{CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu};
 
 use crate::clipboard_helper::{
-    rs_invoke_get_clipboards, rs_invoke_get_user_config, rs_invoke_is_initialized,
-    rs_invoke_search_clipboards, rs_invoke_set_user_config, ClipboardHelper,
+    rs_invoke_get_clipboards, rs_invoke_get_user_config, rs_invoke_search_clipboards,
+    rs_invoke_set_user_config, ClipboardHelper,
 };
 use crate::utils::config::CONFIG;
 
-mod core;
 mod clipboard_helper;
+mod core;
 mod db;
-mod schema;
 mod utils;
 
 #[tauri::command]
@@ -32,13 +31,11 @@ fn open_settings(window: tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
-
-
 #[tokio::main]
 async fn main() {
-    let clipboard_helper = ClipboardHelper::new();
+    let clipboard_helper = ClipboardHelper::new(None, Some(2)).await;
     let clipboard_helper = Arc::new(clipboard_helper);
-    let clipboard_helper_for_setup = clipboard_helper.clone();
+    let clipboard_helper_clone = clipboard_helper.clone();
 
     let quit = CustomMenuItem::new("quit".to_string(), "退出");
     let show_window = CustomMenuItem::new("show_window".to_string(), "显示页面");
@@ -52,15 +49,12 @@ async fn main() {
     tauri::Builder::default()
         .setup(move |app| {
             let app_handle = app.handle();
-            app_handle.asset_protocol_scope().allow_directory(CONFIG.read().unwrap().files_path.as_path(), true)?;
-            let clipboard_helper = clipboard_helper_for_setup.clone();
-            tauri::async_runtime::spawn(async move {
-                let result = time_it!(async  clipboard_helper.init(None, Some(2)).await ).await;
+            app_handle
+                .asset_protocol_scope()
+                .allow_directory(CONFIG.read().unwrap().files_path.as_path(), true)?;
 
-                if let Err(e) = result {
-                    eprintln!("Failed to initialize ClipboardHelper: {}", e);
-                }
-            });
+
+
             // windows
             let window_main = app.get_window("main").unwrap();
             let w_main_handle = window_main.clone();
@@ -103,6 +97,8 @@ async fn main() {
                 }
             });
 
+            // 添加程序退出时的清理操作
+            // let clipboard_helper = clipboard_helper_clone.clone();
             Ok(())
         })
         .system_tray(system_tray)
@@ -131,7 +127,6 @@ async fn main() {
         .invoke_handler(tauri::generate_handler![
             rs_invoke_get_clipboards,
             rs_invoke_search_clipboards,
-            rs_invoke_is_initialized,
             rs_invoke_get_user_config,
             rs_invoke_set_user_config,
             open_settings

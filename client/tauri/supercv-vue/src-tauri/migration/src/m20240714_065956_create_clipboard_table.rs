@@ -17,11 +17,11 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(HostClipboard::Uuid).string().not_null().unique_key())
                     .col(ColumnDef::new(HostClipboard::Type).integer().not_null())
                     .col(ColumnDef::new(HostClipboard::Path).string().not_null())
                     .col(ColumnDef::new(HostClipboard::Content).text().not_null())
                     .col(ColumnDef::new(HostClipboard::Timestamp).integer().not_null())
+                    .col(ColumnDef::new(HostClipboard::Hash).string().not_null())
                     .to_owned(),
             )
             .await
@@ -37,9 +37,9 @@ impl MigrationTrait for Migration {
 enum HostClipboard {
     Table,
     Id,
-    Uuid,
     Type,
     Path,
     Content,
     Timestamp,
+    Hash
 }

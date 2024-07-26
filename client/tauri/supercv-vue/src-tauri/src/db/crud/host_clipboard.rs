@@ -1,5 +1,5 @@
-use crate::db::entities::host_clipboard::{self, Entity as ClipboardEntries};
 use crate::core::pasteboard::PasteboardContent;
+use crate::db::entities::host_clipboard::{self, Entity as ClipboardEntries};
 use crate::utils::config::CONFIG;
 use sea_orm::sea_query::Expr;
 use sea_orm::ActiveValue::Set;

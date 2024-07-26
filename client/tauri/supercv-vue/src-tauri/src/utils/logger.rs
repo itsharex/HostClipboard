@@ -34,6 +34,8 @@ pub fn convert_log(log_int: Option<i32>) -> String {
         _ => "debug".to_string(),
     }
 }
+
+
 #[macro_export]
 macro_rules! time_it {
     // 同步版本
@@ -47,11 +49,11 @@ macro_rules! time_it {
     }};
 
     // 异步版本
-    // let result = time_it!(async { async_function }).await;
+    // let result = time_it!(async { add_clipboard_entry(&db, content) }).await;
     (async $($body:tt)*) => {{
         async {
             let start = tokio::time::Instant::now();
-            let result = { $($body)* };
+            let result = { $($body)* }.await;
             let duration = start.elapsed();
             time_it!(@log_duration, duration);
             result

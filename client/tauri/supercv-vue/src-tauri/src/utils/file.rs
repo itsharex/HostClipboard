@@ -21,7 +21,7 @@ pub fn get_file_size(file_path: &String) -> String {
     let size = match fs::metadata(file_path) {
         Ok(metadata) => metadata.len(),
         Err(e) => {
-            error!("Failed to get file size: {}", e);
+            error!("Failed to get file size: {}, ", e);
             0
         }
     };
