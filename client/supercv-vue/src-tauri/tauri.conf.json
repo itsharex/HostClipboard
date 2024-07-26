@@ -41,7 +41,8 @@
                 "icons/icon.icns",
                 "icons/icon.ico"
             ],
-            "identifier": "com.clipboard-helper.dev",
+            "identifier": "com.supercv.dev",
+            "publisher": "zekeChin",
             "targets": "all"
         },
         "security": {
