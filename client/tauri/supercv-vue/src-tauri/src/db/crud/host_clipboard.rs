@@ -1,66 +1,44 @@
 use crate::core::pasteboard::PasteboardContent;
 use crate::db::entities::host_clipboard::{self, Entity as ClipboardEntries};
 use crate::utils::config::CONFIG;
-use sea_orm::sea_query::Expr;
+use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::ActiveValue::Set;
 use sea_orm::*;
+use crate::db::entities::prelude::HostClipboard;
 
 pub async fn add_clipboard_entry(
     db: &DatabaseConnection,
     item: PasteboardContent,
 ) -> Result<host_clipboard::Model, DbErr> {
-    let new_entry = host_clipboard::ActiveModel {
+    let timestamp = item.date_time.timestamp();
+
+    // 使用 Sea-ORM 的查询构建器进行插入或更新操作
+    let _ = ClipboardEntries::insert(host_clipboard::ActiveModel {
         r#type: Set(item.r#type.to_i32()),
         path: Set(item.path),
         content: Set(item.text_content),
-        timestamp: Set(item.date_time.timestamp()),
-        hash: Set(item.hash),
+        timestamp: Set(timestamp),
+        hash: Set(item.hash.clone()),
         ..Default::default()
-    };
+    })
+    .on_conflict(
+        OnConflict::column(host_clipboard::Column::Hash)
+            .update_column(host_clipboard::Column::Timestamp)
+            .to_owned(),
+    )
+    .exec(db)
+    .await?;
 
-    let res = ClipboardEntries::insert(new_entry).exec(db).await?;
-    ClipboardEntries::find_by_id(res.last_insert_id)
+    // 查询刚插入或更新的记录
+    ClipboardEntries::find()
+        .filter(host_clipboard::Column::Hash.eq(item.hash))
         .one(db)
         .await?
         .ok_or(DbErr::Custom(
-            "Failed to retrieve inserted entry".to_string(),
+            "Failed to retrieve inserted or updated entry".to_string(),
         ))
 }
 
-// pub async fn get_clipboard_entries(
-//     db: &DatabaseConnection,
-// ) -> Result<Vec<host_clipboard::Model>, DbErr> {
-//     ClipboardEntries::find().all(db).await
-// }
-//
-// pub async fn get_clipboard_entries_by_num(
-//     db: &DatabaseConnection,
-//     num: Option<u64>,
-// ) -> Result<Vec<host_clipboard::Model>, DbErr> {
-//     ClipboardEntries::find()
-//         .order_by_desc(host_clipboard::Column::Id)
-//         .limit(num)
-//         .all(db)
-//         .await
-// }
-
-// pub async fn get_num_clipboards_by_timestamp_and_type(
-//     db: &DatabaseConnection,
-//     num: Option<u64>,
-//     type_int: Option<i32>,
-// ) -> Result<Vec<host_clipboard::Model>, DbErr> {
-//     let query = host_clipboard::Entity::find()
-//         .order_by_desc(host_clipboard::Column::Timestamp)
-//         .limit(num);
-//     if let Some(type_int) = type_int {
-//         query
-//             .filter(host_clipboard::Column::Type.eq(type_int))
-//             .all(db)
-//             .await
-//     } else {
-//         query.all(db).await
-//     }
-// }
 pub async fn get_clipboards_by_type_list(
     db: &DatabaseConnection,
     text: Option<&str>,
@@ -73,7 +51,7 @@ pub async fn get_clipboards_by_type_list(
         (text_ts, img_ts, file_ts) // 将值返回给外部变量
     };
 
-    let mut query = host_clipboard::Entity::find();
+    let mut query = HostClipboard::find();
 
     // 根据不同的类型指定不同的时间戳
     query = query.filter(
@@ -120,7 +98,7 @@ pub async fn get_clipboard_entries_by_gt_timestamp(
     db: &DatabaseConnection,
     timestamp: i64,
 ) -> Result<Vec<host_clipboard::Model>, DbErr> {
-    let query = host_clipboard::Entity::find()
+    let query = HostClipboard::find()
         .filter(host_clipboard::Column::Timestamp.gt(timestamp))
         .order_by_desc(host_clipboard::Column::Timestamp);
 
@@ -133,7 +111,7 @@ pub async fn get_clipboard_entries_by_id_list(
 ) -> Result<Vec<host_clipboard::Model>, DbErr> {
     match id_list {
         Some(ids) if !ids.is_empty() => {
-            host_clipboard::Entity::find()
+            HostClipboard::find()
                 .filter(host_clipboard::Column::Id.is_in(ids))
                 .order_by_desc(host_clipboard::Column::Timestamp)
                 .all(db)

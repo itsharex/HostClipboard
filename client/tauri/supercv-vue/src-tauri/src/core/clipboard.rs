@@ -5,14 +5,9 @@ use crate::utils::file::{format_size, get_file_size};
 use crate::utils::hash::hash_vec;
 use crate::utils::time::get_current_date_time;
 use crate::{time_it, utils};
-use chrono::{DateTime, Datelike, FixedOffset};
+use chrono::Datelike;
 use clipboard_rs::common::RustImage;
-use clipboard_rs::{
-    Clipboard, ClipboardContext, ClipboardHandler, ClipboardWatcher, ClipboardWatcherContext,
-    RustImageData, WatcherShutdown,
-};
-use fltk::enums::Cursor::S;
-use image::DynamicImage;
+use clipboard_rs::{Clipboard, ClipboardContext, ClipboardHandler, RustImageData};
 use log::{debug, error};
 use sea_orm::DatabaseConnection;
 use std::io;
@@ -60,7 +55,7 @@ impl ClipboardHandle {
         runtime: Arc<Runtime>,
     ) {
         while let Ok(content) = receiver.recv() {
-            debug!("Received clipboard content: {:?}", content);
+            // debug!("Received clipboard content: {:?}", content);
             runtime.block_on(async {
                 Self::add_clipboard_entry(&db, content).await;
             });
@@ -219,7 +214,7 @@ fn get_local_path(suffix: &str) -> Result<String, io::Error> {
         .unwrap()
         .to_string();
     // 判断root_file_path 是否存在 不存在则递归创建
-    if !std::path::Path::new(&root_file_path).exists() {
+    if !Path::new(&root_file_path).exists() {
         std::fs::create_dir_all(&root_file_path).unwrap_or_else(|e| {
             panic!("Failed to create directories: {}", e);
         });

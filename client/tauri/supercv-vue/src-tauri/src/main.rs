@@ -3,7 +3,6 @@
     windows_subsystem = "windows"
 )]
 
-use log::{debug, info};
 use std::sync::Arc;
 use tauri::GlobalShortcutManager;
 use tauri::Manager;
@@ -35,7 +34,7 @@ fn open_settings(window: tauri::Window) -> Result<(), String> {
 async fn main() {
     let clipboard_helper = ClipboardHelper::new(None, Some(2)).await;
     let clipboard_helper = Arc::new(clipboard_helper);
-    let clipboard_helper_clone = clipboard_helper.clone();
+    // let clipboard_helper_clone = clipboard_helper.clone();
 
     let quit = CustomMenuItem::new("quit".to_string(), "退出");
     let show_window = CustomMenuItem::new("show_window".to_string(), "显示页面");

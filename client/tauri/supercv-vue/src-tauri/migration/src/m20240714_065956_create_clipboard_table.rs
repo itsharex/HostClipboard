@@ -2,6 +2,7 @@ use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -22,6 +23,12 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(HostClipboard::Content).text().not_null())
                     .col(ColumnDef::new(HostClipboard::Timestamp).integer().not_null())
                     .col(ColumnDef::new(HostClipboard::Hash).string().not_null())
+                    .index(
+                        Index::create()
+                            .name("idx_host_clipboard_hash_unique")
+                            .col(HostClipboard::Hash)
+                            .unique()
+                    )
                     .to_owned(),
             )
             .await
@@ -33,7 +40,8 @@ impl MigrationTrait for Migration {
             .await
     }
 }
-#[derive(Iden)]
+
+// 移除了 #[derive(Iden)]
 enum HostClipboard {
     Table,
     Id,
@@ -41,5 +49,24 @@ enum HostClipboard {
     Path,
     Content,
     Timestamp,
-    Hash
+    Hash,
+}
+
+impl Iden for HostClipboard {
+    fn unquoted(&self, s: &mut dyn Write) {
+        write!(
+            s,
+            "{}",
+            match self {
+                Self::Table => "host_clipboard",
+                Self::Id => "id",
+                Self::Type => "type",
+                Self::Path => "path",
+                Self::Content => "content",
+                Self::Timestamp => "timestamp",
+                Self::Hash => "hash",
+            }
+        )
+        .unwrap();
+    }
 }

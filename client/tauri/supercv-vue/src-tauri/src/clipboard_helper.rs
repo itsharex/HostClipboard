@@ -4,7 +4,6 @@ use sea_orm::DatabaseConnection;
 use std::io;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
 
 use crate::core::clipboard::ClipboardHandle;
 use crate::db::connection::init_db_connection;
@@ -17,7 +16,6 @@ use crate::utils::{config, logger};
 pub struct ClipboardHelper {
     db: Arc<Mutex<DatabaseConnection>>,
     watcher_shutdown: WatcherShutdown,
-    // watcher_handle: JoinHandle<()>,
 }
 
 impl ClipboardHelper {
