@@ -27,7 +27,7 @@ jobs:
       run:
         working-directory: ./client/supercv-vue
 
-    runs-on: ${{ matrix.config.platform }}
+    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
