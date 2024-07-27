@@ -364,7 +364,7 @@ const handleSelectPasteItem = (index: number, item: any) => {
 
 .paste-content-item {
   width: 100%;
-  height: 20px;
+  height: 25px;
   display: flex;
   align-items: center;
   border-radius: 5px;
