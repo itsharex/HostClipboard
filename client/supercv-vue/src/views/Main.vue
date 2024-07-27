@@ -279,7 +279,7 @@ const handleSelectPasteItem = (index: number, item: any) => {
   display: none;
 }
 .paste-settings:hover {
-  background-color: rgba(88, 206, 141, 0.5);
+  background-color: rgba(88, 206, 141, 0.7);
   .paste-settings-icon-normal {
     display: none;
   }
@@ -309,22 +309,28 @@ const handleSelectPasteItem = (index: number, item: any) => {
   display: flex;
   margin-top: 10px;
   column-gap: 10px;
+  height: 0;
 }
 .paste-content-list {
   flex: 1;
   display: flex;
   flex-direction: column;
   row-gap: 5px;
+  overflow-y: auto;
 }
 .paste-content-desc {
   flex: 1;
   display: flex;
   flex-direction: column;
   width: 0;
+  row-gap: 5px;
 }
 
 .desc-wrapper {
   flex: 1;
+  height: 0;
+  flex-shrink: 0;
+  overflow-y: auto;
 }
 
 .desc-wrapper pre {
@@ -349,7 +355,7 @@ const handleSelectPasteItem = (index: number, item: any) => {
 }
 
 .timestamp-wrapper {
-  height: 20px;
+  /* height: 20px; */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -358,7 +364,7 @@ const handleSelectPasteItem = (index: number, item: any) => {
 
 .paste-content-item {
   width: 100%;
-  height: 25px;
+  height: 20px;
   display: flex;
   align-items: center;
   border-radius: 5px;
@@ -367,13 +373,14 @@ const handleSelectPasteItem = (index: number, item: any) => {
   font-size: 16px;
   cursor: default;
   column-gap: 5px;
+  flex-shrink: 0;
 }
 .paste-content-item:hover {
-  background: rgba(88, 206, 141, 0.5);
+  background: rgba(88, 206, 141, 0.7);
   color: #fff;
 }
 .paste-content-item-selected {
-  background: rgba(88, 206, 141, 0.5);
+  background: rgba(88, 206, 141, 0.7);
   color: #fff;
 }
 .paste-item-icon {
