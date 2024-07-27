@@ -48,11 +48,6 @@ async fn main() {
     tauri::Builder::default()
         .setup(move |app| {
             let app_handle = app.handle();
-            app_handle
-                .asset_protocol_scope()
-                .allow_directory(CONFIG.read().unwrap().files_path.as_path(), true)?;
-
-
 
             // windows
             let window_main = app.get_window("main").unwrap();

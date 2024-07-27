@@ -132,7 +132,7 @@ impl ClipboardHandle {
             format_size(img.get_bytes().len())
         );
         let hash = hash_vec(img.get_bytes());
-        let path = get_local_path("tiff").unwrap();
+        let path = get_local_path("png").unwrap();
         img.save_to_path(&path).unwrap();
         if self.check_hash(&hash) {
             return None;
