@@ -1,3 +1,4 @@
+use std::error::Error;
 use crate::core::pasteboard::{ContentType, PasteboardContent};
 use crate::db::crud::host_clipboard::add_clipboard_entry;
 use crate::utils::config::CONFIG;
@@ -7,7 +8,7 @@ use crate::utils::time::get_current_date_time;
 use crate::{time_it, utils};
 use chrono::Datelike;
 use clipboard_rs::common::RustImage;
-use clipboard_rs::{Clipboard, ClipboardContext, ClipboardHandler, RustImageData};
+use clipboard_rs::{Clipboard, ClipboardContent, ClipboardContext, ClipboardHandler, RustImageData};
 use log::{debug, error};
 use sea_orm::DatabaseConnection;
 use std::io;
@@ -18,11 +19,13 @@ use std::thread::JoinHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
 use url::Url;
+use crate::db::entities::host_clipboard::Model;
+use crate::db::entities::prelude::HostClipboard;
 
 pub struct ClipboardHandle {
     db: Arc<Mutex<DatabaseConnection>>,
     ctx: ClipboardContext,
-    last_hash: String,
+    pub(crate) last_hash: String,
     sender: Sender<PasteboardContent>,
     receiver_handle: JoinHandle<()>,
     runtime: Arc<Runtime>,
@@ -68,90 +71,39 @@ impl ClipboardHandle {
             .await
             .unwrap();
     }
+    pub async fn set(&self, items: Vec<Model>) -> Result<(), String> {
+        let first_type = items.first().map(|item| item.r#type);
 
-    fn new_text_content(&mut self, text_content: String) -> Option<PasteboardContent> {
-        if string_is_large(&text_content) || text_content.trim().is_empty() {
-            return None;
+        // Ensure all items have the same type
+        if !items.iter().all(|item| Some(item.r#type) == first_type) {
+            return Err("All items must have the same type".into());
         }
 
-        let hash = utils::hash::hash_str(&text_content);
-        if self.check_hash(&hash) {
-            return None;
-        }
-        self.last_hash = hash.clone();
-        return Some(PasteboardContent::new(
-            text_content,
-            ContentType::Text,
-            hash,
-            None,
-        ));
-    }
-
-    fn new_file_content(&mut self, file_url: String) -> Option<PasteboardContent> {
-        const IMG_EXTENSIONS: [&str; 5] = ["png", "jpg", "jpeg", "bmp", "gif"];
-
-        let file_end = file_url.rsplit('.').next().unwrap_or("");
-        let is_image = IMG_EXTENSIONS
-            .iter()
-            .any(|&ext| ext == file_end.to_lowercase());
-
-        let url = Url::parse(&*file_url).expect("Invalid URL");
-        let path_str = url.to_file_path().unwrap().to_str().unwrap().to_string();
-        let hash = utils::hash::hash_str(&path_str);
-
-        if self.check_hash(&hash) {
-            return None;
-        }
-        self.last_hash = hash.clone();
-
-        return if is_image {
-            let text_content = format!("Image: {} ({})", path_str, get_file_size(&path_str));
-            Some(PasteboardContent::new(
-                text_content,
-                ContentType::Image,
-                hash,
-                Some(path_str),
-            ))
-        } else {
-            let text_content = format!("File: {} ({})", path_str, get_file_size(&path_str));
-            Some(PasteboardContent::new(
-                text_content,
-                ContentType::File,
-                hash,
-                Some(path_str),
-            ))
+        // Determine clipboard content based on the type
+        let clipboard_content: Vec<ClipboardContent> = match first_type {
+            Some(0) => items.into_iter().map(|item| ClipboardContent::Text(item.content)).collect(),
+            Some(1) => items.into_iter().map(|item| {
+                RustImageData::from_path(&*item.path)
+                    .map(ClipboardContent::Image)
+                    .map_err(|e| format!("Error loading image data: {}", e))
+            }).collect::<Result<Vec<_>, _>>()?,
+            Some(2) => {
+                let paths: Vec<_> = items.into_iter().map(|item| item.path).collect();
+                return self.ctx.set_files(paths)
+                    .map_err(|e| {
+                        error!("Error setting files: {}", e);
+                        e.to_string()
+                    });
+            }
+            _ => return Err("Invalid type".into()),
         };
-    }
 
-    fn new_img_content(&mut self, img: &RustImageData) -> Option<PasteboardContent> {
-        let (w, h) = img.get_size();
-        let text_content = format!(
-            "Image: {}x{} ({})",
-            w,
-            h,
-            format_size(img.get_bytes().len())
-        );
-        let hash = hash_vec(img.get_bytes());
-        let path = get_local_path("png").unwrap();
-        img.save_to_path(&path).unwrap();
-        if self.check_hash(&hash) {
-            return None;
-        }
-        self.last_hash = hash.clone();
-        Some(PasteboardContent::new(
-            text_content,
-            ContentType::Image,
-            hash,
-            Some(path),
-        ))
-    }
-    fn check_hash(&self, hash: &str) -> bool {
-        return if self.last_hash == *hash {
-            debug!("check_hash true");
-            true
-        } else {
-            false
-        };
+        // Set clipboard content
+        self.ctx.set(clipboard_content)
+            .map_err(|e| {
+                error!("Error setting clipboard: {}", e);
+                e.to_string()
+            })
     }
 }
 
@@ -191,38 +143,105 @@ impl ClipboardHandler for ClipboardHandle {
     }
 }
 
-fn string_is_large(input: &String) -> bool {
+pub(crate) fn string_is_large(input: &String) -> bool {
     const LARGE_SIZE: usize = 250000;
     let input_len = input.len();
     debug!("get_sting_length: {}", input_len);
     input_len > LARGE_SIZE
 }
 
-fn get_local_path(suffix: &str) -> Result<String, io::Error> {
-    let date_time = get_current_date_time();
-    let root_file_path = CONFIG
-        .read()
-        .unwrap()
-        .files_path
-        .join(format!(
-            "{}{}{}",
-            date_time.year(),
-            date_time.month(),
-            date_time.day()
-        ))
-        .to_str()
-        .unwrap()
-        .to_string();
-    // 判断root_file_path 是否存在 不存在则递归创建
-    if !Path::new(&root_file_path).exists() {
-        std::fs::create_dir_all(&root_file_path).unwrap_or_else(|e| {
-            panic!("Failed to create directories: {}", e);
-        });
+
+#[cfg(test)]
+mod tests {
+    use crate::db::connection::init_db_connection;
+    use super::*;
+    use crate::db::entities::host_clipboard::Model;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    #[tokio::test]
+    async fn test_set_text() {
+        let db_connection = init_db_connection(None)
+            .await
+            .expect("Failed to connect to database");
+        let db = Arc::new(Mutex::new(db_connection));
+        let mut clipboard_manager = ClipboardHandle::new(db.clone());
+
+        let text = "abc输出输出test".to_string();
+        let item = Model {
+            id: 0,
+            r#type: 0,
+            path: "".to_string(),
+            content: text.clone(),
+            timestamp: 0,
+            hash: "abc".to_string(),
+        };
+
+        let result = clipboard_manager.set(vec![item]).await;
+        assert!(result.is_ok());
+
+        match clipboard_manager.ctx.get_text() {
+            Ok(c_text) if !c_text.is_empty() => {
+                assert_eq!(c_text, text);
+            }
+            _ => { panic!("not text"); }
+
+        }
     }
-    Ok(format!(
-        "{}/{}.{}",
-        root_file_path,
-        date_time.timestamp(),
-        suffix
-    ))
+
+    #[tokio::test]
+    async fn test_set_img() {
+        let db_connection = init_db_connection(None)
+            .await
+            .expect("Failed to connect to database");
+        let db = Arc::new(Mutex::new(db_connection));
+        let clipboard_manager = ClipboardHandle::new(db.clone());
+
+        let img_path = "/Users/zeke/Pictures/704_1020913_847718.jpg".to_string();
+        let item = Model {
+            id: 0,
+            r#type: 1,
+            path: img_path.clone(),
+            content: "图片".to_string(),
+            timestamp: 0,
+            hash: "abc".to_string(),
+        };
+
+        let result = clipboard_manager.set(vec![item]).await;
+        assert!(result.is_ok());
+        match clipboard_manager.ctx.get_files() {
+            Ok(file_urls) if !file_urls.is_empty() => {
+                assert!(file_urls[0].contains(&img_path));
+            }
+            _ => { panic!("not file"); }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_file() {
+        let db_connection = init_db_connection(None)
+            .await
+            .expect("Failed to connect to database");
+        let db = Arc::new(Mutex::new(db_connection));
+        let clipboard_manager = ClipboardHandle::new(db.clone());
+
+        let file_path = "/Users/zeke/Downloads/RustRover-2024.1.5-aarch64.dmg".to_string();
+        let item = Model {
+            id: 0,
+            r#type: 2,
+            path: file_path.clone(),
+            content: "File: /Users/zeke/Downloads/two_windows.zip".to_string(),
+            timestamp: 0,
+            hash: "abc".to_string(),
+        };
+
+        let result = clipboard_manager.set(vec![item]).await;
+        assert!(result.is_ok());
+        match clipboard_manager.ctx.get_files() {
+            Ok(file_urls) if !file_urls.is_empty() => {
+                assert!(file_urls[0].contains(&file_path));
+            }
+            _ => { panic!("not file"); }
+        }
+    }
 }
