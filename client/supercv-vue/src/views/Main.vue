@@ -15,6 +15,7 @@ function openSettings() {
 }
 
 
+
 const displayContent = computed(() => {
     if (selectedIndex.value >= 0 && selectedIndex.value < clipboardEntries.value.length) {
         return clipboardEntries.value[selectedIndex.value].content;
@@ -64,10 +65,16 @@ async function searchClipboard() {
     }
 }
 
-async function copyToClipboardAndHide(content: string) {
+async function copyToClipboardAndHide(item: ClipboardEntry) {
     try {
-        await navigator.clipboard.writeText(content);
-        console.log("Content copied to clipboard");
+
+        if (item.type == 0) {
+            await navigator.clipboard.writeText(item.content);
+            console.log("使用navigator set clipboard");
+        } else {
+            await ClipboardHelper.setClipboardEntriy(item);
+            console.log("使用rust set clipboard");
+        }
         await appWindow.hide();
     } catch (err) {
         console.error("Failed to copy text or hide window: ", err);
@@ -86,10 +93,11 @@ function handleKeydown(e: KeyboardEvent) {
         ) {
             selectedIndex.value++;
         }
-    } else if (e.key === "Enter") {
+    } else if (e.key === "Enter" || ((e.metaKey || e.ctrlKey) && e.key === "c")) {
+        e.preventDefault(); // 阻止默认的复制操作
         if (selectedIndex.value !== -1) {
             const selectedItem = clipboardEntries.value[selectedIndex.value];
-            copyToClipboardAndHide(selectedItem.content);
+            copyToClipboardAndHide(selectedItem);
         }
     } else if (e.key === "Escape") {
         appWindow.hide();
@@ -177,15 +185,17 @@ const formattedTimestamp = computed(() => {
                     <li v-for="(item, index) in clipboardEntries" :key="item.id"
                         :class="{ selected: index === selectedIndex }" @click="() => {
                             selectedIndex = index;
-                            copyToClipboardAndHide(item.content);
+                            copyToClipboardAndHide(item);
                         }
                             " @mouseover="() => {
-                                if (!isKeyboardSelection) {
-                                    selectedIndex = index;
-                                }
-                            }
-                                ">
-                        {{ item.content }}
+        if (!isKeyboardSelection) {
+            selectedIndex = index;
+        }
+    }
+        ">
+                        <template v-if="item.type === 0">📝 {{ item.content }}</template>
+                        <template v-if="item.type === 1">🖼️ {{ item.content }}</template>
+                        <template v-if="item.type === 2">📁 {{ item.content }}</template>
                     </li>
                 </ul>
             </div>
@@ -257,6 +267,7 @@ html {
 
 #selectable-list {
     list-style-type: none;
+    font-size: 14px;
     padding: 0;
     margin: 0;
 }

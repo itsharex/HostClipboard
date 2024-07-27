@@ -103,7 +103,7 @@ impl ClipboardHandle {
         self.last_hash = hash.clone();
 
         return if is_image {
-            let text_content = format!("Image: {} ({})", path_str, get_file_size(&path_str));
+            let text_content = format!("Img: {} ({})", path_str, get_file_size(&path_str));
             Some(PasteboardContent::new(
                 text_content,
                 ContentType::Image,
@@ -124,7 +124,7 @@ impl ClipboardHandle {
     pub(crate) fn new_img_content(&mut self, img: &RustImageData) -> Option<PasteboardContent> {
         let (w, h) = img.get_size();
         let text_content = format!(
-            "Image: {}x{} ({})",
+            "Img: {}x{} ({})",
             w,
             h,
             format_size(img.get_bytes().len())

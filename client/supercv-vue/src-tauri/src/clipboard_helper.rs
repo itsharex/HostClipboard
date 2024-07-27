@@ -1,8 +1,9 @@
-use clipboard_rs::{ClipboardWatcher, ClipboardWatcherContext, WatcherShutdown};
+use clipboard_rs::{Clipboard, ClipboardContent, ClipboardContext, ClipboardWatcher, ClipboardWatcherContext, RustImageData, WatcherShutdown};
 use log::{debug, error};
 use sea_orm::DatabaseConnection;
 use std::io;
 use std::sync::Arc;
+use clipboard_rs::common::RustImage;
 use tokio::sync::Mutex;
 
 use crate::core::clipboard::ClipboardHandle;
@@ -15,6 +16,7 @@ use crate::utils::{config, logger};
 
 pub struct ClipboardHelper {
     db: Arc<Mutex<DatabaseConnection>>,
+    ctx: ClipboardContext,
     watcher_shutdown: WatcherShutdown,
 }
 
@@ -41,6 +43,7 @@ impl ClipboardHelper {
 
         Self {
             db,
+            ctx: ClipboardContext::new().unwrap(),
             watcher_shutdown,
             // watcher_handle,
         }
@@ -79,6 +82,43 @@ impl ClipboardHelper {
         Ok(all_entries)
     }
 
+
+    pub async fn set(&self, items: Vec<Model>) -> Result<(), String> {
+        let first_type = items.first().map(|item| item.r#type);
+
+        // Ensure all items have the same type
+        if !items.iter().all(|item| Some(item.r#type) == first_type) {
+            return Err("All items must have the same type".into());
+        }
+
+        // Determine clipboard content based on the type
+        let clipboard_content: Vec<ClipboardContent> = match first_type {
+            Some(0) => items.into_iter().map(|item| ClipboardContent::Text(item.content)).collect(),
+            Some(1) | Some(2) => {
+                let paths: Vec<_> = items.into_iter().map(|item| item.path).collect();
+                return self.ctx.set_files(paths)
+                    .map_err(|e| {
+                        error!("Error setting files: {}", e);
+                        e.to_string()
+                    });
+            }
+            _ => return Err("Invalid type".into()),
+        };
+
+        // Set clipboard content
+        self.ctx.set(clipboard_content)
+            .map_err(|e| {
+                error!("Error setting clipboard: {}", e);
+                e.to_string()
+            })
+    }
+    async fn set_clipboard(
+        &self,
+        clipboard: Model,
+    ) -> Result<(), String> {
+        self.set(vec![clipboard]).await
+    }
+
     pub async fn get_user_config() -> UserConfig {
         CONFIG.read().unwrap().user_config.clone()
     }
@@ -114,6 +154,20 @@ pub async fn rs_invoke_search_clipboards(
         Err(e) => {
             error!("rs_invoke_search_clipboards err: {:?}", e);
             Err(format!("Failed to search clipboards: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn rs_invoke_set_clipboards(
+    state: tauri::State<'_, Arc<ClipboardHelper>>,
+    item: Model,
+) -> Result<bool, String>{
+    match state.set_clipboard(item).await {
+        Ok(_) => Ok(true),
+        Err(e) => {
+            error!("rs_invoke_set_clipboards err: {:?}", e);
+            Err(format!("Failed to set clipboard: {}", e))
         }
     }
 }

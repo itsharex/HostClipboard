@@ -8,10 +8,7 @@ use tauri::GlobalShortcutManager;
 use tauri::Manager;
 use tauri::{CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu};
 
-use crate::clipboard_helper::{
-    rs_invoke_get_clipboards, rs_invoke_get_user_config, rs_invoke_search_clipboards,
-    rs_invoke_set_user_config, ClipboardHelper,
-};
+use crate::clipboard_helper::{rs_invoke_get_clipboards, rs_invoke_get_user_config, rs_invoke_search_clipboards, rs_invoke_set_user_config, ClipboardHelper, rs_invoke_set_clipboards};
 use crate::utils::config::CONFIG;
 
 mod clipboard_helper;
@@ -121,6 +118,7 @@ async fn main() {
         .invoke_handler(tauri::generate_handler![
             rs_invoke_get_clipboards,
             rs_invoke_search_clipboards,
+            rs_invoke_set_clipboards,
             rs_invoke_get_user_config,
             rs_invoke_set_user_config,
             open_settings

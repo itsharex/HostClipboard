@@ -1,4 +1,6 @@
-use flexi_logger::{colored_opt_format, opt_format, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming};
+use flexi_logger::{
+    colored_opt_format, opt_format, Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming,
+};
 
 use crate::utils::config::CONFIG;
 pub fn init_logger(log_level: Option<i32>, sql_level: Option<i32>) {
@@ -10,7 +12,9 @@ pub fn init_logger(log_level: Option<i32>, sql_level: Option<i32>) {
     println!("logger setting: {}", logger_str);
     Logger::try_with_str(logger_str)
         .unwrap()
-        .log_to_file(FileSpec::default().directory(CONFIG.read().unwrap().logs_path.to_str().unwrap()))
+        .log_to_file(
+            FileSpec::default().directory(CONFIG.read().unwrap().logs_path.to_str().unwrap()),
+        )
         .format_for_files(opt_format)
         .format_for_stderr(colored_opt_format)
         .rotate(
@@ -34,7 +38,6 @@ pub fn convert_log(log_int: Option<i32>) -> String {
         _ => "debug".to_string(),
     }
 }
-
 
 #[macro_export]
 macro_rules! time_it {
@@ -73,8 +76,8 @@ macro_rules! time_it {
             (nanos as f64, "ns")
         };
         debug!(
-            "file={}:{} elapsed={:.3} {}",
-            file!(), line!(), value, unit
+            "execution time={:.3} {}",
+            value, unit
         );
     }};
 }
