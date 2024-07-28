@@ -10,6 +10,8 @@ use tauri::{CustomMenuItem, SystemTray, SystemTrayEvent, SystemTrayMenu};
 
 use crate::clipboard_helper::{rs_invoke_get_clipboards, rs_invoke_get_user_config, rs_invoke_search_clipboards, rs_invoke_set_user_config, ClipboardHelper, rs_invoke_set_clipboards};
 use crate::utils::config::CONFIG;
+use window_vibrancy::{apply_blur, apply_vibrancy, NSVisualEffectMaterial};
+
 
 mod clipboard_helper;
 mod core;
@@ -45,9 +47,15 @@ async fn main() {
     tauri::Builder::default()
         .setup(move |app| {
             let app_handle = app.handle();
-
             // windows
             let window_main = app.get_window("main").unwrap();
+            #[cfg(target_os = "macos")]
+            apply_vibrancy(&window_main, NSVisualEffectMaterial::HudWindow, None, Some(12.0)).expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
+
+            #[cfg(target_os = "windows")]
+            apply_blur(&window_main, Some((18, 18, 18, 125))).expect("Unsupported platform! 'apply_blur' is only supported on Windows");
+            
+
             let w_main_handle = window_main.clone();
             window_main.set_decorations(false).unwrap();
             let window_settings = app.get_window("settings").unwrap();

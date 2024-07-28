@@ -1,384 +1,403 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from "vue";
-import { appWindow } from "@tauri-apps/api/window";
-import { ClipboardHelper, ClipboardEntry } from "../clipboardHelper";
-import { invoke } from "@tauri-apps/api/tauri";
-import { convertFileSrc } from '@tauri-apps/api/tauri';
+import { ref, onMounted, computed, watch } from 'vue'
+import { appWindow } from '@tauri-apps/api/window'
+import { ClipboardHelper, ClipboardEntry } from '../clipboardHelper'
+import { invoke } from '@tauri-apps/api/tauri'
+import { convertFileSrc } from '@tauri-apps/api/tauri'
 
-const textInput = ref("");
-const clipboardEntries = ref<ClipboardEntry[]>([]);
-const selectedIndex = ref(-1);
-let isKeyboardSelection = ref(true);
+const textInput = ref('')
+const clipboardEntries = ref<ClipboardEntry[]>([])
+const selectedIndex = ref(-1)
+let isKeyboardSelection = ref(true)
 
 function openSettings() {
     invoke("rs_invoke_open_settings");
 }
 
-
-
 const displayContent = computed(() => {
-    if (selectedIndex.value >= 0 && selectedIndex.value < clipboardEntries.value.length) {
-        return clipboardEntries.value[selectedIndex.value].content;
-    }
-    return "";
-});
+  if (
+    selectedIndex.value >= 0 &&
+    selectedIndex.value < clipboardEntries.value.length
+  ) {
+    return clipboardEntries.value[selectedIndex.value].content
+  }
+  return ''
+})
 
 const selectedEntry = computed(() => {
-    if (selectedIndex.value >= 0 && selectedIndex.value < clipboardEntries.value.length) {
-        return clipboardEntries.value[selectedIndex.value];
-    }
-    return null;
-});
+  if (
+    selectedIndex.value >= 0 &&
+    selectedIndex.value < clipboardEntries.value.length
+  ) {
+    return clipboardEntries.value[selectedIndex.value]
+  }
+  return null
+})
 
 const isImageEntry = computed(() => {
-    console.log("imageSrc", selectedEntry.value)
-    return selectedEntry.value?.type === 1;
-});
+  console.log('imageSrc', selectedEntry.value)
+  return selectedEntry.value?.type === 1
+})
 
 const imageSrc = computed(() => {
-    if (isImageEntry.value && selectedEntry.value) {
-        console.log("imageSrc", selectedEntry.value.path)
-        return convertFileSrc(selectedEntry.value.path);
-    }
-    return '';
-});
+  if (isImageEntry.value && selectedEntry.value) {
+    console.log('imageSrc', selectedEntry.value.path)
+    return convertFileSrc(selectedEntry.value.path)
+  }
+  return ''
+})
 
 async function getClipboardContent() {
-    try {
-        clipboardEntries.value = await ClipboardHelper.getClipboardEntries();
-        selectedIndex.value = -1; // Reset selection
-    } catch (error) {
-        console.error("Failed to get clipboard content:", error);
-        clipboardEntries.value = [];
-    }
+  try {
+    clipboardEntries.value = await ClipboardHelper.getClipboardEntries()
+    selectedIndex.value = -1 // Reset selection
+  } catch (error) {
+    console.error('Failed to get clipboard content:', error)
+    clipboardEntries.value = []
+  }
 }
 
 async function searchClipboard() {
-    try {
-        clipboardEntries.value = await ClipboardHelper.searchClipboardEntries(
-            textInput.value
-        );
-        selectedIndex.value = -1; // Reset selection
-    } catch (error) {
-        console.error("Failed to search clipboard content:", error);
-        clipboardEntries.value = [];
-    }
+  try {
+    clipboardEntries.value = await ClipboardHelper.searchClipboardEntries(
+      textInput.value
+    )
+    selectedIndex.value = -1 // Reset selection
+  } catch (error) {
+    console.error('Failed to search clipboard content:', error)
+    clipboardEntries.value = []
+  }
 }
 
 async function copyToClipboardAndHide(item: ClipboardEntry) {
-    try {
-
-        if (item.type == 0) {
-            await navigator.clipboard.writeText(item.content);
-            console.log("使用navigator set clipboard");
-        } else {
-            await ClipboardHelper.setClipboardEntriy(item);
-            console.log("使用rust set clipboard");
-        }
-        await appWindow.hide();
-    } catch (err) {
-        console.error("Failed to copy text or hide window: ", err);
+  try {
+    if (item.type == 0) {
+      await navigator.clipboard.writeText(item.content)
+      console.log('使用navigator set clipboard')
+    } else {
+      await ClipboardHelper.setClipboardEntriy(item)
+      console.log('使用rust set clipboard')
     }
+    await appWindow.hide()
+  } catch (err) {
+    console.error('Failed to copy text or hide window: ', err)
+  }
 }
 
 function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        e.preventDefault();
-        isKeyboardSelection.value = true;
-        if (e.key === "ArrowUp" && selectedIndex.value > 0) {
-            selectedIndex.value--;
-        } else if (
-            e.key === "ArrowDown" &&
-            selectedIndex.value < clipboardEntries.value.length - 1
-        ) {
-            selectedIndex.value++;
-        }
-    } else if (e.key === "Enter" || ((e.metaKey || e.ctrlKey) && e.key === "c")) {
-        e.preventDefault(); // 阻止默认的复制操作
-        if (selectedIndex.value !== -1) {
-            const selectedItem = clipboardEntries.value[selectedIndex.value];
-            copyToClipboardAndHide(selectedItem);
-        }
-    } else if (e.key === "Escape") {
-        appWindow.hide();
-    } else if ((e.metaKey || e.ctrlKey) && e.key === ",") {
-        e.preventDefault(); // 阻止默认行为
-        try {
-            openSettings();
-        } catch (e) {
-            console.error("Failed to open settings:", e);
-        }
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault()
+    isKeyboardSelection.value = true
+    if (e.key === 'ArrowUp' && selectedIndex.value > 0) {
+      selectedIndex.value--
+    } else if (
+      e.key === 'ArrowDown' &&
+      selectedIndex.value < clipboardEntries.value.length - 1
+    ) {
+      selectedIndex.value++
     }
+  } else if (e.key === 'Enter' || ((e.metaKey || e.ctrlKey) && e.key === 'c')) {
+    e.preventDefault() // 阻止默认的复制操作
+    if (selectedIndex.value !== -1) {
+      const selectedItem = clipboardEntries.value[selectedIndex.value]
+      copyToClipboardAndHide(selectedItem)
+    }
+  } else if (e.key === 'Escape') {
+    appWindow.hide()
+  } else if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+    e.preventDefault() // 阻止默认行为
+    try {
+      openSettings()
+    } catch (e) {
+      console.error('Failed to open settings:', e)
+    }
+  }
 }
 
 function handleMouseMove() {
-    isKeyboardSelection.value = false;
+  isKeyboardSelection.value = false
 }
 
-const inputRef = ref<HTMLInputElement | null>(null);
+const inputRef = ref<HTMLInputElement | null>(null)
 
 onMounted(async () => {
-    await getClipboardContent();
-    document.addEventListener("keydown", handleKeydown);
-    document.addEventListener("mousemove", handleMouseMove);
+  await getClipboardContent()
+  document.addEventListener('keydown', handleKeydown)
+  document.addEventListener('mousemove', handleMouseMove)
 
-    await appWindow.onFocusChanged(({ payload: focused }) => {
-        if (focused) {
-            textInput.value = "";
-            getClipboardContent();
-            inputRef.value?.focus();
-        }
-    });
+  await appWindow.onFocusChanged(({ payload: focused }) => {
+    if (focused) {
+      textInput.value = ''
+      getClipboardContent()
+      inputRef.value?.focus()
+    }
+  })
 
-    inputRef.value?.focus();
-});
+  inputRef.value?.focus()
+})
 
 watch(textInput, () => {
-    if (textInput.value.trim() !== "") {
-        searchClipboard();
-    } else {
-        getClipboardContent();
-    }
-});
+  if (textInput.value.trim() !== '') {
+    searchClipboard()
+  } else {
+    getClipboardContent()
+  }
+})
 
 const selectedTimestamp = computed(() => {
-    if (
-        selectedIndex.value >= 0 &&
-        selectedIndex.value < clipboardEntries.value.length
-    ) {
-        return clipboardEntries.value[selectedIndex.value].timestamp;
-    }
-    return null;
-});
+  if (
+    selectedIndex.value >= 0 &&
+    selectedIndex.value < clipboardEntries.value.length
+  ) {
+    return clipboardEntries.value[selectedIndex.value].timestamp
+  }
+  return null
+})
 
 const formattedTimestamp = computed(() => {
-    if (selectedTimestamp.value) {
-        // 将秒转换为毫秒
-        const milliseconds = selectedTimestamp.value * 1000;
-        const date = new Date(milliseconds);
+  if (selectedTimestamp.value) {
+    // 将秒转换为毫秒
+    const milliseconds = selectedTimestamp.value * 1000
+    const date = new Date(milliseconds)
 
-        // 使用更易读的格式
-        const options: Intl.DateTimeFormatOptions = {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false,
-        };
-
-        return date.toLocaleString(undefined, options);
+    // 使用更易读的格式
+    const options: Intl.DateTimeFormatOptions = {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
     }
-    return "";
-});
+
+    return date.toLocaleString(undefined, options)
+  }
+  return ''
+})
+
+const pasteItemIcon = computed(() => (type: number) => {
+  switch (type) {
+    case 0:
+      return '📝'
+    case 1:
+      return '🖼️'
+    case 2:
+      return '📁'
+    default:
+      return '📝'
+  }
+})
+
+const handleSelectPasteItem = (index: number, item: any) => {
+  selectedIndex.value = index
+  copyToClipboardAndHide(item)
+}
 </script>
 
 <template>
-    <div id="app">
-        <div id="input-container">
-            <input ref="inputRef" v-model="textInput" type="text" id="text-input" placeholder="Enter text..." />
-        </div>
-        <div id="content-container">
-            <div id="list-container">
-                <ul id="selectable-list">
-                    <li v-for="(item, index) in clipboardEntries" :key="item.id"
-                        :class="{ selected: index === selectedIndex }" @click="() => {
-                            selectedIndex = index;
-                            copyToClipboardAndHide(item);
-                        }
-                            " @mouseover="() => {
-        if (!isKeyboardSelection) {
-            selectedIndex = index;
-        }
-    }
-        ">
-                        <template v-if="item.type === 0">📝 {{ item.content }}</template>
-                        <template v-if="item.type === 1">🖼️ {{ item.content }}</template>
-                        <template v-if="item.type === 2">📁 {{ item.content }}</template>
-                    </li>
-                </ul>
-            </div>
-            <div id="display-container">
-                <div class="content-wrapper">
-                    <img v-if="isImageEntry" :src="imageSrc" alt="Clipboard image" />
-                    <pre v-else>{{ displayContent }}</pre>
-                </div>
-                <div class="timestamp-wrapper">
-                    <div class="timestamp" v-if="selectedTimestamp">
-                        {{ formattedTimestamp }}
-                    </div>
-                    <button @click="openSettings" class="settings-button">⚙️</button>
-                </div>
-            </div>
-        </div>
+  <div class="main" data-tauri-drag-region>
+    <div class="paste-filter">
+      <input class="paste-filter-input" ref="inputRef" v-model="textInput" />
     </div>
+    <div class="paste-content">
+      <div class="paste-content-list">
+        <div
+          class="paste-content-item"
+          :class="{
+            'paste-content-item-selected': selectedIndex === index,
+          }"
+          v-for="(item, index) in clipboardEntries"
+          :key="item.id"
+          @mouseover="
+            () => {
+              selectedIndex = index
+            }
+          "
+          @click="handleSelectPasteItem(index, item)"
+        >
+          <div class="paste-item-icon">
+            {{ pasteItemIcon(item.type) }}
+          </div>
+          <div class="paste-item-text">
+            {{ item.content }}
+          </div>
+          <div class="paste-item-shortcut"></div>
+        </div>
+      </div>
+      <div class="paste-content-desc">
+        <div class="desc-wrapper">
+          <img v-if="isImageEntry" :src="imageSrc" alt="Clipboard image" />
+          <pre v-else>{{ displayContent }}</pre>
+        </div>
+        <div class="timestamp-wrapper" data-tauri-drag-region>
+          <p class="timestamp-content">
+            <span v-if="selectedTimestamp">
+              {{ formattedTimestamp }}
+            </span>
+            <span v-else> 输入值筛选剪贴板内容 </span>
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="paste-settings">
+      <img
+        class="paste-settings-icon paste-settings-icon-normal"
+        src="../assets/settings.svg"
+        alt="Settings"
+        @click="openSettings"
+      />
+      <img
+        class="paste-settings-icon paste-settings-icon-hover"
+        src="../assets/settings-hover.svg"
+        alt="Settings"
+        @click="openSettings"
+      />
+    </div>
+  </div>
 </template>
 
 <style>
-body,
-html {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-        "Helvetica Neue", Arial, sans-serif;
-    overflow: hidden;
-    /* 防止内容超出圆角区域 */
+.main {
+  width: 100%;
+  height: 100vh;
+  padding: 15px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.paste-settings {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 5px;
+  padding: 3px;
+}
+.paste-settings-icon-hover {
+  display: none;
+}
+.paste-settings:hover {
+  background-color: rgba(88, 206, 141, 0.7);
+  .paste-settings-icon-normal {
+    display: none;
+  }
+  .paste-settings-icon-hover {
+    display: block;
+  }
+}
+.paste-settings-icon {
+  width: 25px;
+}
+.paste-filter {
+  width: 100%;
+}
+.paste-filter-input {
+  width: 100%;
+  height: 30px;
+  border-radius: 5px;
+  border: none;
+  box-shadow: none;
+  outline: none;
+  background: rgba(0, 0, 0, 0.1);
+  padding-left: 5px;
+  font-size: 18px;
+}
+.paste-content {
+  flex: 1;
+  display: flex;
+  margin-top: 10px;
+  column-gap: 10px;
+  height: 0;
+}
+.paste-content-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  row-gap: 5px;
+  overflow-y: auto;
+}
+.paste-content-desc {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 0;
+  row-gap: 5px;
 }
 
-#app {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    border-radius: 12px;
-    overflow: hidden;
-    background-color: #ffffff;
-    /* 或者您想要的背景色 */
+.desc-wrapper {
+  flex: 1;
+  height: 0;
+  flex-shrink: 0;
+  overflow-y: auto;
 }
 
-#input-container {
-    padding: 10px;
-    background-color: #f0f0f0;
-    display: flex;
-    justify-content: center;
+.desc-wrapper pre {
+  font-size: 13.5px;
+  font-family: system-ui, sans-serif;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+  line-height: 1.4;
 }
 
-#text-input {
-    width: 100%;
-    padding: 10px;
-    font-size: 16px;
-    border: 1px solid #ccc;
-    border-radius: 12px;
-    /* 圆角效果 */
-}
-
-#content-container {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-}
-
-#list-container {
-    width: 50%;
-    overflow-y: auto;
-    border-right: 1px solid #ccc;
-}
-
-#selectable-list {
-    list-style-type: none;
-    font-size: 14px;
-    padding: 0;
-    margin: 0;
-}
-
-#selectable-list li {
-    padding: 10px;
-    cursor: pointer;
-    border-bottom: 1px solid #eee;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    border-radius: 8px;
-    /* 圆角效果 */
-}
-
-#selectable-list li.selected {
-    background-color: #4caf50;
-    color: white;
-    border-radius: 8px;
-    /* 圆角效果 */
-}
-
-#display-container {
-    width: 50%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-}
-
-.content-wrapper {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 10px;
-    padding-bottom: 40px;
-    /* 为时间戳留出空间 */
-    border-radius: 12px;
-    /* 圆角效果 */
-}
-
-.content-wrapper pre {
-    font-size: 13.5px;
-    font-family: system-ui, sans-serif;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    margin: 0;
-    line-height: 1.4;
+.desc-wrapper img {
+  display: block;
+  /* 设置 img 为块级元素 */
+  margin: auto;
+  /* 自动外边距实现水平居中 */
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  /* 垂直居中（如果父元素是 flex 或 grid 容器） */
+  align-self: center;
 }
 
 .timestamp-wrapper {
-    height: 30px;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* Center the timestamp */
-    background-color: #f0f0f0;
-    border-top: 1px solid #ccc;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    padding: 0 10px;
-    box-sizing: border-box;
+  /* height: 20px; */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3c3a3a;
 }
 
-.timestamp {
-    font-size: 15px;
-    color: #666;
-    padding: 2px 5px;
-    border-radius: 8px;
-    /* 圆角效果 */
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.paste-content-item {
+  width: 100%;
+  height: 25px;
+  display: flex;
+  align-items: center;
+  border-radius: 5px;
+  padding-left: 5px;
+  font-weight: 300;
+  font-size: 16px;
+  cursor: default;
+  column-gap: 5px;
+  flex-shrink: 0;
 }
-
-.settings-button {
-    padding: 5px 10px;
-    background-color: transparent;
-    color: #4caf50;
-    border: none;
-    border-radius: 8px;
-    /* 圆角效果 */
-    cursor: pointer;
-    font-size: 18px;
-    position: absolute;
-    right: 0.3%;
-    /* 固定距离右边缘 */
-    bottom: 50%;
-    /* 在包装中垂直居中 */
-    transform: translateY(50%);
-    /* 调整垂直定心 */
+.paste-content-item:hover {
+  background: rgba(88, 206, 141, 0.7);
+  color: #fff;
 }
-
-.settings-button:hover {
-    background-color: rgba(28, 57, 29, 0.1);
-    border-radius: 12px;
-    /* 圆角效果 */
+.paste-content-item-selected {
+  background: rgba(88, 206, 141, 0.7);
+  color: #fff;
 }
-
-
-.content-wrapper img {
-    display: block;
-    /* 设置 img 为块级元素 */
-    margin: auto;
-    /* 自动外边距实现水平居中 */
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    /* 垂直居中（如果父元素是 flex 或 grid 容器） */
-    align-self: center;
+.paste-item-icon {
+  width: 20px;
+  font-size: 15px;
+}
+.paste-item-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 0;
+}
+.paste-item-shortcut {
+  width: 30px;
 }
 </style>
