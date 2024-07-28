@@ -10,20 +10,22 @@
 
 [English](README_en.md)
 
-## 预览
-
-|                文本                |               图片               |               文件                |
-| :--------------------------------: | :------------------------------: | :-------------------------------: |
-| ![text](./docs/imgs/show_text.png) | ![img](./docs/imgs/show_img.png) | ![img](./docs/imgs/show_file.png) |
-
-**<u>使用 `CommandOrControl+Shift+L` 唤出 SuperCV 页面</u>**
-
-## 关于
+## 介绍
 
 SuperCV 利用 Tauri 和 Rust 构建，是一个剪切板增强工具。
 
 支持文本、图片和文件的剪切板历史及搜索功能，支持局域网内多设备剪切板同步。
 常见问题见 [FAQ](./docs/faq.md)
+
+## 预览
+
+**<u>使用 `CommandOrControl+Shift+L` 唤出 SuperCV 页面</u>**
+
+|                文本                |               图片               |               文件                |
+| :--------------------------------: | :------------------------------: | :-------------------------------: |
+| ![text](./docs/imgs/show_text.png) | ![img](./docs/imgs/show_img.png) | ![img](./docs/imgs/show_file.png) |
+
+![text](./docs/imgs/项目架构图.jpg)
 
 ## 安装
 

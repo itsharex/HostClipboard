@@ -9,6 +9,13 @@
 
 [简体中文](README.md)
 
+## Introduce
+
+SuperCV is built with Tauri and Rust, serving as an enhanced clipboard tool.
+
+It supports clipboard history and search functions for text, images, and files, and enables clipboard synchronization across multiple devices on a local network.
+Common questions refer to [FAQ](./docs/faq.md)
+
 ## Preview
 
 |                Text                |              Image               |               File                |
@@ -16,13 +23,6 @@
 | ![text](./docs/imgs/show_text.png) | ![img](./docs/imgs/show_img.png) | ![img](./docs/imgs/show_file.png) |
 
 **<u>Use `CommandOrControl+Shift+L` to summon the SuperCV interface</u>**
-
-## 关于
-
-SuperCV is built with Tauri and Rust, serving as an enhanced clipboard tool. 
-
-It supports clipboard history and search functions for text, images, and files, and enables clipboard synchronization across multiple devices on a local network.
-Common questions refer to [FAQ](./docs/faq.md)
 
 ## Installation
 
