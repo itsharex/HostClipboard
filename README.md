@@ -25,8 +25,6 @@ SuperCV 利用 Tauri 和 Rust 构建，是一个剪切板增强工具。
 | :--------------------------------: | :------------------------------: | :-------------------------------: |
 | ![text](./docs/imgs/show_text.png) | ![img](./docs/imgs/show_img.png) | ![img](./docs/imgs/show_file.png) |
 
-![text](./docs/imgs/项目架构图.jpg)
-
 ## 安装
 
 请到发布页面下载对应的安装包：[Release Page](https://github.com/Zeke-chin/HostClipboard/releases)
