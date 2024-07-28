@@ -41,7 +41,8 @@
         "bundle": {
             "active": true,
             "icon": [
-                "icons/app.png"
+                "icons/app.png",
+                "icons/icon.ico"
             ],
             "identifier": "com.supercv.dev",
             "publisher": "zekeChin",
