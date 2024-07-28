@@ -231,8 +231,11 @@ const handleSelectPasteItem = (index: number, item: any) => {
           <pre v-else>{{ displayContent }}</pre>
         </div>
         <div class="timestamp-wrapper" data-tauri-drag-region>
-          <p class="timestamp-content" v-if="selectedTimestamp">
-            {{ formattedTimestamp }}
+          <p class="timestamp-content">
+            <span v-if="selectedTimestamp">
+              {{ formattedTimestamp }}
+            </span>
+            <span v-else> 输入值筛选剪贴板内容 </span>
           </p>
         </div>
       </div>
