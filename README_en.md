@@ -1,66 +1,65 @@
 <h1 align="center">
   <img src="./client/supercv-vue/src-tauri/icons/app.png" alt="SuperCV" width="228" />
   <br>
-  更适合CV工程师体质的
+  A Clipboard Enhancement Tool📋
   <br>
-  <br>
-  剪切板增强工具📋
+  Better Suited for CV Engineers
   <br>
 </h1>
 
-[English](README_en.md)
+[简体中文](README.md)
 
-## 预览
+## Preview
 
-|                文本                |               图片               |               文件                |
+|                Text                |              Image               |               File                |
 | :--------------------------------: | :------------------------------: | :-------------------------------: |
 | ![text](./docs/imgs/show_text.png) | ![img](./docs/imgs/show_img.png) | ![img](./docs/imgs/show_file.png) |
 
-**<u>使用 `CommandOrControl+Shift+L` 唤出 SuperCV 页面</u>**
+**<u>Use `CommandOrControl+Shift+L` to summon the SuperCV interface</u>**
 
 ## 关于
 
-SuperCV 利用 Tauri 和 Rust 构建，是一个剪切板增强工具。
+SuperCV is built with Tauri and Rust, serving as an enhanced clipboard tool. 
 
-支持文本、图片和文件的剪切板历史及搜索功能，支持局域网内多设备剪切板同步。
-常见问题见 [FAQ](./docs/faq.md)
+It supports clipboard history and search functions for text, images, and files, and enables clipboard synchronization across multiple devices on a local network.
+Common questions refer to [FAQ](./docs/faq.md)
 
-## 安装
+## Installation
 
-请到发布页面下载对应的安装包：[Release Page](https://github.com/Zeke-chin/HostClipboard/releases)已验证支持桌面平台 Windows(x64), Linux(x64), MacOS (Intel/apple)
+Please go to the release page to download the corresponding installation package: [Release Page](https://github.com/Zeke-chin/HostClipboard/releases) Confirmed support for desktop platforms Windows(x64), Linux(x64), MacOS (Intel/Apple)
 
-其他桌面平台 未测试
+Other desktop platforms not tested
 
-## 特性
+## Features
 
-- **轻量化** 使用 tauri 打包，底层使用零开销的 rust 提供良好性能
-- 支持局域网多设备**共享剪切板**(待实现)
-- 文本、图片、文件类型的剪切板的历史和搜索 🔍
-- 分别对文本、图片、文件类型设置保留时间
-- 支持设置预览条数
+- **Lightweight** - Packaged with tauri, providing excellent performance with zero-overhead rust
+- Supports local network clipboard sharing between multiple devices (to be implemented)
+- Clipboard history and search for text, image, and file types🔍
+- Separate retention time settings for text, images, and files
+- Supports setting the number of preview items
 
 ## TODO
 
-- 🗒️ 快捷键配置
-- 🗒️ 支持多文件
-- 🗒️ 服务端同步功能
+- 🗒️ Shortcut key configuration
+- 🗒️ Support for multiple files
+- 🗒️ Server-side synchronization feature
 - ....
 
-## 开发指南
+## Development Guide
 
-1. 安装依赖
-   - Rust: [install](https://www.rust-lang.org/tools/install) , version >= `1.63`
+1. Install dependencies
+   - Rust: [install](https://www.rust-lang.org/tools/install), version >= `1.63`
    - Node: [install](https://nodejs.org/en/download/package-manager), version >= `20.15`
-   - (如果你是 Linux): `sudo apt-get update && sudo apt-get install -y libgtk-3-dev webkit2gtk-4.0 libappindicator3-dev librsvg2-dev patchelf`
-2. clone 仓库
+   - (If you are on Linux): `sudo apt-get update && sudo apt-get install -y libgtk-3-dev webkit2gtk-4.0 libappindicator3-dev librsvg2-dev patchelf`
+2. Clone the repository
 
-   - `git clone https://github.com/Zeke-chin/HostClipboard `
+   - `git clone https://github.com/Zeke-chin/HostClipboard`
 
    - `cd  HostClipboard`
 
-3. 安装前端依赖
+3. Install frontend dependencies
    - `npm install` or `yarn`
-4. 启动 dev
+4. Start development
    - `npm run tauri dev`
 
 <!DOCTYPE html>
@@ -90,7 +89,7 @@ SuperCV 利用 Tauri 和 Rust 构建，是一个剪切板增强工具。
     </style>
 </head>
 <body>
-    <h2>开发者</h2>
+    <h2>Developers</h2>
     <ul class="developer-list">
         <li class="developer-item">
             <img src="https://avatars.githubusercontent.com/u/84116651?v=4" alt="img" width="75" height="75">
@@ -108,8 +107,8 @@ SuperCV 利用 Tauri 和 Rust 构建，是一个剪切板增强工具。
 </body>
 </html>
 
-## 感谢
+## Acknowledgments
 
-- [ChurchTao/clipboard-rs](https://github.com/ChurchTao/clipboard-rs) :Cross-platform clipboard API (text | image | rich text | html | files | monitoring changes)
+- [ChurchTao/clipboard-rs](https://github.com/ChurchTao/clipboard-rs): Cross-platform clipboard API (text | image | rich text | html | files | monitoring changes)
 - [tauri-apps/tauri](https://github.com/tauri-apps/tauri): Build smaller, faster, and more secure desktop applications with a web frontend.
 - [clash-verge-rev/clash-verge-rev](https://github.com/clash-verge-rev/clash-verge-rev): Continuation of Clash Verge - A Clash Meta GUI based on Tauri (Windows, MacOS, Linux)

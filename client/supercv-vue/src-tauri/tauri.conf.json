@@ -1,81 +1,80 @@
 {
-  "build": {
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist"
-  },
-  "package": {
-    "productName": "SuperCV",
-    "version": "0.0.2"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "fs": {
-        "all": false,
-        "readFile": true,
-        "readDir": true
-      },
-      "protocol": {
-        "all": true,
-        "assetScope": {
-          "allow": ["**", "/**"],
-          "requireLiteralLeadingDot": false
-        }
-      },
-      "shell": {
-        "all": false,
-        "open": true
-      },
-      "globalShortcut": {
-        "all": true
-      },
-      "window": {
-        "all": true
-      }
+    "build": {
+        "beforeDevCommand": "npm run dev",
+        "beforeBuildCommand": "npm run build",
+        "devPath": "http://localhost:1420",
+        "distDir": "../dist"
     },
-    "bundle": {
-      "active": true,
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "identifier": "com.supercv.dev",
-      "publisher": "zekeChin",
-      "targets": "all"
+    "package": {
+        "productName": "SuperCV",
+        "version": "0.0.2"
     },
-    "security": {
-      "csp": null
-    },
-    "systemTray": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true
-    },
-    "windows": [
-      {
-        "label": "main",
-        "fullscreen": false,
-        "resizable": false,
-        "title": "SuperCV",
-        "width": 800,
-        "height": 600,
-        "transparent": true,
-        "decorations": false
-      },
-      {
-        "label": "settings",
-        "fullscreen": false,
-        "resizable": true,
-        "title": "Settings",
-        "width": 1000,
-        "height": 800,
-        "url": "index.html#/settings"
-      }
-    ],
-    "macOSPrivateApi": true
-  }
+    "tauri": {
+        "allowlist": {
+            "all": false,
+            "fs": {
+                "all": false,
+                "readFile": true,
+                "readDir": true
+            },
+            "protocol": {
+                "all": true,
+                "assetScope": {
+                    "allow": [
+                        "**",
+                        "/**"
+                    ],
+                    "requireLiteralLeadingDot": false
+                }
+            },
+            "shell": {
+                "all": false,
+                "open": true
+            },
+            "globalShortcut": {
+                "all": true
+            },
+            "window": {
+                "all": true
+            }
+        },
+        "bundle": {
+            "active": true,
+            "icon": [
+                "icons/app.png"
+            ],
+            "identifier": "com.supercv.dev",
+            "publisher": "zekeChin",
+            "targets": "all"
+        },
+        "security": {
+            "csp": null
+        },
+        "systemTray": {
+            "iconPath": "icons/system.png",
+            "iconAsTemplate": true
+        },
+        "windows": [
+            {
+                "label": "main",
+                "fullscreen": false,
+                "resizable": false,
+                "title": "SuperCV",
+                "width": 800,
+                "height": 600,
+                "transparent": true,
+                "decorations": false
+            },
+            {
+                "label": "settings",
+                "fullscreen": false,
+                "resizable": true,
+                "title": "Settings",
+                "width": 1000,
+                "height": 800,
+                "url": "index.html#/settings"
+            }
+        ],
+        "macOSPrivateApi": true
+    }
 }
