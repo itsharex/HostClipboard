@@ -11,7 +11,7 @@ const selectedIndex = ref(-1);
 let isKeyboardSelection = ref(true);
 
 function openSettings() {
-    invoke("open_settings");
+    invoke("rs_invoke_open_settings");
 }
 
 

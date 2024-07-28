@@ -17,7 +17,7 @@ mod db;
 mod utils;
 
 #[tauri::command]
-fn open_settings(window: tauri::Window) -> Result<(), String> {
+fn rs_invoke_open_settings(window: tauri::Window) -> Result<(), String> {
     if let Some(settings_window) = window.get_window("settings") {
         settings_window.show().map_err(|e| e.to_string())?;
         settings_window.set_focus().map_err(|e| e.to_string())?;
@@ -121,7 +121,7 @@ async fn main() {
             rs_invoke_set_clipboards,
             rs_invoke_get_user_config,
             rs_invoke_set_user_config,
-            open_settings
+            rs_invoke_open_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
