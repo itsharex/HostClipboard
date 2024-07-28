@@ -68,26 +68,6 @@ SuperCV 利用 Tauri 和 Rust 构建，是一个剪切板增强工具。
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        .developer-list {
-            list-style-type: none;
-            padding: 0;
-        }
-        .developer-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .developer-item img {
-            border-radius: 50%;
-            margin-right: 10px;
-        }
-        .developer-item .name {
-            font-size: 1.2em;
-            color: #0366d6;
-            text-decoration: none;
-        }
-    </style>
 </head>
 <body>
     <h2>开发者</h2>
